@@ -18,3 +18,8 @@ PS: The title is just a joke, we're not communists ok? Well, I'm not. I can't sp
 PPS: I made this in early 2024 (May 27th at the latest), before 
 [Codebuff](https://codebuff.com/referrals/ref-146ce36c-53e8-435c-a7f6-e180206dd0ee), 
 which is what I'd've used today in 2025.
+
+
+# Hosting
+
+This is hosted on Replit. There's no backend, just browser localstorage.
