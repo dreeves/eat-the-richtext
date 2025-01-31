@@ -23,3 +23,5 @@ which is what I'd've used today in 2025.
 # Hosting
 
 This is hosted on Replit. There's no backend, just browser localstorage.
+
+<https://eat-the-richtext.dreev.es>
