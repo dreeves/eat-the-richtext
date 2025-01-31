@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eat The Richtext</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f4d3.svg" type="image/svg+xml">
+
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:title" content="Eat The Richtext">
+  <meta property="og:description" content="Handy tool to keep from losing formatting like italics when pasting into places that only take plain text">
+  <meta property="og:image" content="https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f4d3.svg">
+  <meta property="og:url" content="https://eat-the-richtext.dreev.es">
+  <link rel="canonical"      href="https://eat-the-richtext.dreev.es"/>
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Include Quill CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+  <!-- Include Tippy.js CSS -->
+  <link href="https://unpkg.com/tippy.js@6.3.1/dist/tippy.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="editor-container" id="editor-container">
+      <div id="editor" aria-label="Rich text editor"></div>
+    </div>
+    <div class="divider" id="divider"></div>
+    <div class="markdown-container" id="markdown-container">
+      <div class="header">
+        <button class="copy-btn" onclick="copyMarkdown()" aria-label="Copy to clipboard">📋</button>
+        Eat The Richtext <span id="version"></span>
+        <span class="help-icon" onclick="showHelp()" aria-label="What is happening here?">❓</span>
+      </div>
+      <textarea class="markdown" id="markdown" aria-label="Markdown editor"></textarea>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal" role="dialog" aria-labelledby="helpModalTitle">
+    <div class="modal-content">
+      <span class="close" onclick="closeHelp()" aria-label="Close help">&times;</span>
+      <div id="helpContent"></div>
+    </div>
+  </div>
+
+  <!-- Include Quill JS -->
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.min.js"></script>
+  <!-- Include Marked JS -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Include Turndown JS -->
+  <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.min.js"></script>
+  <!-- Include Tippy.js -->
+  <script src="https://unpkg.com/@popperjs/core@2"></script>
+  <script src="https://unpkg.com/tippy.js@6"></script>
+  <script type="module" src="constants.js"></script>
+  <script type="module">
+    import { DEBOUNCE_INTERVAL, VERSION } from './constants.js';
+    import { initializeApp } from './script.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeApp(DEBOUNCE_INTERVAL, VERSION);
+    });
+  </script>
+</body>
+</html>
