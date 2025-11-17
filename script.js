@@ -19,9 +19,62 @@ const initializeApp = (debounceInterval, version) => {
     console.warn('Quill Better Table not available');
   }
   
-  const turndownService = new TurndownService();
+  const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced'
+  });
   
-  // Add table support via GFM plugin
+  // Add custom rule to handle quill-better-table wrapper and attributes
+  turndownService.addRule('quillBetterTableWrapper', {
+    filter: (node) => {
+      return node.nodeName === 'DIV' && 
+             node.classList && 
+             node.classList.contains('quill-better-table-wrapper');
+    },
+    replacement: (content) => {
+      return content;
+    }
+  });
+  
+  // Clean up quill-better-table specific attributes and classes
+  turndownService.addRule('cleanTableAttributes', {
+    filter: ['table', 'tbody', 'thead', 'tr', 'td', 'th'],
+    replacement: (content, node) => {
+      const tag = node.nodeName.toLowerCase();
+      
+      // For table cells, extract just the text content from nested p tags
+      if (tag === 'td' || tag === 'th') {
+        // Get text content, stripping out the qlbt-cell-line p tags
+        let cellContent = '';
+        for (const child of node.childNodes) {
+          if (child.nodeName === 'P' && child.classList && child.classList.contains('qlbt-cell-line')) {
+            cellContent += child.textContent || '';
+          } else {
+            cellContent += child.textContent || content;
+          }
+        }
+        return `<${tag}>${cellContent.trim()}</${tag}>`;
+      }
+      
+      // For other table elements, just preserve with clean attributes
+      if (tag === 'table') {
+        return `<table>${content}</table>`;
+      }
+      if (tag === 'tbody') {
+        return `<tbody>${content}</tbody>`;
+      }
+      if (tag === 'thead') {
+        return `<thead>${content}</thead>`;
+      }
+      if (tag === 'tr') {
+        return `<tr>${content}</tr>`;
+      }
+      
+      return content;
+    }
+  });
+  
+  // Add table support via GFM plugin (must be added AFTER custom rules)
   if (window.turndownPluginGfm) {
     const gfm = window.turndownPluginGfm.gfm;
     turndownService.use(gfm);
