@@ -8,11 +8,27 @@ const $ = (id) => document.getElementById(id);
 
 const initializeApp = (debounceInterval, version) => {
   const markdownTextarea = $('markdown');
+  
+  // Register Quill Better Table module
+  if (window.quillBetterTable) {
+    Quill.register({
+      'modules/better-table': window.quillBetterTable
+    }, true);
+    console.log('Quill Better Table module registered');
+  } else {
+    console.warn('Quill Better Table not available');
+  }
+  
   const turndownService = new TurndownService();
   
   // Add table support via GFM plugin
-  const gfm = window.turndownPluginGfm.gfm;
-  turndownService.use(gfm);
+  if (window.turndownPluginGfm) {
+    const gfm = window.turndownPluginGfm.gfm;
+    turndownService.use(gfm);
+    console.log('Table support enabled via GFM plugin');
+  } else {
+    console.error('Turndown GFM plugin not loaded!');
+  }
   
   const divider = $('divider');
   const container = document.querySelector('.container');
@@ -37,42 +53,59 @@ const initializeApp = (debounceInterval, version) => {
   };
 
   // Initialize Quill editor with custom toolbar
+  const modules = {
+    toolbar: {
+      container: [
+        [{ header: [1, 2, 3, 4, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['blockquote', 'code-block'],
+        ['link', 'image'],
+        [{ 'clean': 'true' }]  // Add clear formatting button
+      ],
+      handlers: {
+        bold:        createHandler('bold'),
+        italic:      createHandler('italic'),
+        underline:   createHandler('underline'),
+        strike:      createHandler('strike'),
+        blockquote:  createHandler('blockquote'),
+        'code-block': createHandler('code-block'),
+        link: () => {
+          const value = prompt('Enter the URL');
+          quill.format('link', value);
+        },
+        image: () => {
+          const value = prompt('Enter the image URL');
+          quill.format('image', value);
+        },
+        clean: () => {
+          const range = quill.getSelection();
+          if (range) {
+            quill.removeFormat(range.index, range.length);
+          }
+        }
+      },
+    }
+  };
+
+  // Add table support if available
+  if (window.quillBetterTable) {
+    modules.table = false;
+    modules['better-table'] = {
+      operationMenu: {
+        items: {
+          unmergeCells: { text: 'Unmerge cells' }
+        }
+      }
+    };
+    modules.keyboard = {
+      bindings: window.quillBetterTable.keyboardBindings || {}
+    };
+  }
+
   const quill = new Quill('#editor', {
     theme: 'snow',
-    modules: {
-      toolbar: {
-        container: [
-          [{ header: [1, 2, 3, 4, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
-          ['blockquote', 'code-block'],
-          ['link', 'image'],
-          [{ 'clean': 'true' }]  // Add clear formatting button
-        ],
-        handlers: {
-          bold:        createHandler('bold'),
-          italic:      createHandler('italic'),
-          underline:   createHandler('underline'),
-          strike:      createHandler('strike'),
-          blockquote:  createHandler('blockquote'),
-          'code-block': createHandler('code-block'),
-          link: () => {
-            const value = prompt('Enter the URL');
-            quill.format('link', value);
-          },
-          image: () => {
-            const value = prompt('Enter the image URL');
-            quill.format('image', value);
-          },
-          clean: () => {
-            const range = quill.getSelection();
-            if (range) {
-              quill.removeFormat(range.index, range.length);
-            }
-          }
-        },
-      },
-    },
+    modules: modules
   });
 
   // Add tooltips to Quill toolbar buttons
@@ -146,7 +179,19 @@ const initializeApp = (debounceInterval, version) => {
     if (isUpdating) return;
     isUpdating = true;
     const html = quill.getSemanticHTML();
+    
+    // Debug: log HTML to see what Quill produces
+    if (html.includes('table')) {
+      console.log('HTML from Quill:', html);
+    }
+    
     const markdown = htmlToMarkdown(html);
+    
+    // Debug: log markdown conversion
+    if (html.includes('table')) {
+      console.log('Markdown output:', markdown);
+    }
+    
     markdownTextarea.value = markdown;
     saveContent();
     isUpdating = false;
