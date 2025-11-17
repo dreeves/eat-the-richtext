@@ -9,6 +9,11 @@ const $ = (id) => document.getElementById(id);
 const initializeApp = (debounceInterval, version) => {
   const markdownTextarea = $('markdown');
   const turndownService = new TurndownService();
+  
+  // Add table support via GFM plugin
+  const gfm = window.turndownPluginGfm.gfm;
+  turndownService.use(gfm);
+  
   const divider = $('divider');
   const container = document.querySelector('.container');
   let isDragging = false;
@@ -129,7 +134,11 @@ const initializeApp = (debounceInterval, version) => {
   // Convert HTML to Markdown
   const htmlToMarkdown = (html) => turndownService.turndown(html);
 
-  // Convert Markdown to HTML
+  // Convert Markdown to HTML with GFM tables enabled
+  marked.setOptions({
+    gfm: true,
+    breaks: true
+  });
   const markdownToHtml = (markdown) => marked.parse(markdown);
 
   // Sync changes from Quill editor to Markdown textarea

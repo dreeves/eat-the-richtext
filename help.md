@@ -14,6 +14,8 @@ Or vice versa.
 You can even jump back and forth, like if you forget the markdown syntax for something. 
 Whatever you like!)
 
+**Tables:** You can paste HTML tables into the rich text side and they'll convert to Markdown tables automatically. Or type Markdown tables on the right side using pipes (`|`) and hyphens (`-`) — the standard GitHub-flavored markdown table syntax.
+
 <br>&nbsp;<br>
 
 This is totally free.
