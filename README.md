@@ -1,32 +1,28 @@
+
 Eat The Richtext
 ================
 
-Type or paste text on the left or right side and watch it convert itself on the other side. It's pretty self-explanatory!
+See 
+[my LessWrong post](https://www.lesswrong.com/posts/fFu4tZom8twYdEyeD/eat-the-richtext) 
+for the backstory.
 
-The problem this is solving is, you know how if you copy/paste formatted text (aka rich text aka RTF) into Discord or Slack or GitHub or other places that expect plain text, it destroys all the formatting? Which is _mostly_ exactly what you want but the italics in particular is very important to preserve. Losing the italics can totally change the meaning!
-
-So now instead of painstakingly putting underscores or stars around the italicized words and otherwise markdownifying the lost formatting, just paste into the left side of this rich text eater and have that done by magic on the right side.
-
-(Or if you're a weirdo who likes WYSIWYG you can use the left side as an editor and see the corresponding markdown on the right. Or vice versa. You can even jump back and forth, like if you forget the markdown syntax for something. Whatever you like!)
-
-This is totally free. If you find it useful and want to express your gratitude, maybe sign up for [Beeminder](https://www.beeminder.com/)?
-
-_written by Daniel Reeves in collaboration with GPT4o which wrote literally all of the code_
-
-PS: The title is just a joke, we're not communists ok? Well, I'm not. I can't speak for ChatGPT.
-
-PPS: I made this in early 2024 (May 27th at the latest), before 
-[Codebuff](https://codebuff.com/referrals/ref-146ce36c-53e8-435c-a7f6-e180206dd0ee), 
-which is what I'd've used today in 2025.
+Short version: 
+Type or paste text on the left or right side and watch it convert itself on the other side. 
+It's pretty self-explanatory!
 
 ## Tables
 
-You should be able to paste HTML tables into the rich text side and get a GitHub-flavored markdown version on the right side. Or vice versa: Markdown on the right using pipes (`|`) and hyphens (`-`) to get rich text on the left.
+You can paste tables into the richtext side and get a GitHub-flavored markdown version.
+Or vice versa: Markdown on the right using pipes (`|`) and hyphens (`-`) yields a richtext table on the left.
 
+## Superscripts
+
+There's no syntax for superscripts in markdown but html is always allowed in markdown so Eat The Richtext turns superscripts like x<sup>y</sup> into `x<sup>y</sup>`.
 
 # Hosting
 
-This is hosted on Replit. There's no backend, just browser localstorage.
+This is currently hosted on Replit but I intend to move it to GitHub Pages.
+There's no backend, just browser localstorage.
 
 <https://eat-the-richtext.dreev.es>
 

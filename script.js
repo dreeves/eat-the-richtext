@@ -266,33 +266,54 @@ marked.setOptions({
 });
 const markdownToHtml = (markdown) => {
   let html = marked.parse(markdown);
-  
-  // Add colgroup to tables so Quill Better Table doesn't error
+
+  // Transform tables for Quill Better Table compatibility
   if (html.includes('<table')) {
     const temp = document.createElement('div');
     temp.innerHTML = html;
-    
+
     temp.querySelectorAll('table').forEach(table => {
+      // Convert thead to tbody (Better Table doesn't use thead)
+      const thead = table.querySelector('thead');
+      if (thead) {
+        const tbody = table.querySelector('tbody') || document.createElement('tbody');
+        // Convert th to td in header row
+        thead.querySelectorAll('th').forEach(th => {
+          const td = document.createElement('td');
+          td.innerHTML = th.innerHTML;
+          th.replaceWith(td);
+        });
+        // Move thead rows to start of tbody
+        while (thead.firstChild) {
+          tbody.insertBefore(thead.firstChild, tbody.firstChild);
+        }
+        thead.remove();
+        if (!table.contains(tbody)) {
+          table.appendChild(tbody);
+        }
+      }
+
+      // Add colgroup if missing
       if (!table.querySelector('colgroup')) {
         const firstRow = table.querySelector('tr');
         if (firstRow) {
           const cellCount = firstRow.querySelectorAll('td, th').length;
           const colgroup = document.createElement('colgroup');
-          
+
           for (let i = 0; i < cellCount; i++) {
             const col = document.createElement('col');
-            col.width = 150; // Set as number property
+            col.setAttribute('width', '100');
             colgroup.appendChild(col);
           }
-          
+
           table.insertBefore(colgroup, table.firstChild);
         }
       }
     });
-    
+
     html = temp.innerHTML;
   }
-  
+
   return html;
 };
 
