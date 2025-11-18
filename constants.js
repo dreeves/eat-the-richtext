@@ -1,2 +1,2 @@
-export const VERSION = 'v1.3.5'; // 2025-11-17 - Added table support
+export const VERSION = 'v2025.11.17-a';
 export const DEBOUNCE_INTERVAL = 300;
