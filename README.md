@@ -19,9 +19,15 @@ PPS: I made this in early 2024 (May 27th at the latest), before
 [Codebuff](https://codebuff.com/referrals/ref-146ce36c-53e8-435c-a7f6-e180206dd0ee), 
 which is what I'd've used today in 2025.
 
+## Tables
+
+You should be able to paste HTML tables into the rich text side and get a GitHub-flavored markdown version on the right side. Or vice versa: Markdown on the right using pipes (`|`) and hyphens (`-`) to get rich text on the left.
+
 
 # Hosting
 
 This is hosted on Replit. There's no backend, just browser localstorage.
 
 <https://eat-the-richtext.dreev.es>
+
+
