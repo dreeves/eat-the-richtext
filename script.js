@@ -25,57 +25,7 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
-// Add custom rule to handle quill-better-table wrapper and attributes
-turndownService.addRule('quillBetterTableWrapper', {
-  filter: (node) => {
-    return node.nodeName === 'DIV' && 
-           node.classList && 
-           node.classList.contains('quill-better-table-wrapper');
-  },
-  replacement: (content) => {
-    return content;
-  }
-});
-
-// Clean up quill-better-table specific attributes and classes
-turndownService.addRule('cleanTableAttributes', {
-  filter: ['table', 'tbody', 'thead', 'tr', 'td', 'th'],
-  replacement: (content, node) => {
-    const tag = node.nodeName.toLowerCase();
-    
-    // For table cells, extract just the text content from nested p tags
-    if (tag === 'td' || tag === 'th') {
-      // Get text content, stripping out the qlbt-cell-line p tags
-      let cellContent = '';
-      for (const child of node.childNodes) {
-        if (child.nodeName === 'P' && child.classList && child.classList.contains('qlbt-cell-line')) {
-          cellContent += child.textContent || '';
-        } else {
-          cellContent += child.textContent || content;
-        }
-      }
-      return `<${tag}>${cellContent.trim()}</${tag}>`;
-    }
-    
-    // For other table elements, just preserve with clean attributes
-    if (tag === 'table') {
-      return `<table>${content}</table>`;
-    }
-    if (tag === 'tbody') {
-      return `<tbody>${content}</tbody>`;
-    }
-    if (tag === 'thead') {
-      return `<thead>${content}</thead>`;
-    }
-    if (tag === 'tr') {
-      return `<tr>${content}</tr>`;
-    }
-    
-    return content;
-  }
-});
-
-// Add table support via GFM plugin (must be added AFTER custom rules)
+// Add table support via GFM plugin
 if (window.turndownPluginGfm) {
   const gfm = window.turndownPluginGfm.gfm;
   turndownService.use(gfm);
@@ -218,8 +168,77 @@ const saveContent = () => {
   }
 };
 
+// Clean Quill Better Table artifacts from HTML
+const cleanTableHtml = (html) => {
+  if (!html) return html;
+  
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  
+  // Remove wrapper divs
+  temp.querySelectorAll('.quill-better-table-wrapper').forEach(wrapper => {
+    wrapper.replaceWith(...wrapper.childNodes);
+  });
+  
+  // Strip all data-* attributes from table elements
+  temp.querySelectorAll('table, tbody, thead, tr, td, th').forEach(el => {
+    Array.from(el.attributes).forEach(attr => {
+      if (attr.name.startsWith('data-') || attr.name === 'contenteditable') {
+        el.removeAttribute(attr.name);
+      }
+    });
+    // Also remove quill-better-table classes
+    if (el.classList.contains('quill-better-table')) {
+      el.classList.remove('quill-better-table');
+      if (el.classList.length === 0) {
+        el.removeAttribute('class');
+      }
+    }
+  });
+  
+  // Unwrap p.qlbt-cell-line paragraphs, preserving their content
+  temp.querySelectorAll('p.qlbt-cell-line').forEach(p => {
+    p.replaceWith(...p.childNodes);
+  });
+  
+  // Remove colgroup elements (they're just width hints)
+  temp.querySelectorAll('colgroup').forEach(cg => cg.remove());
+  
+  // Convert first row to thead with th elements for proper GFM conversion
+  temp.querySelectorAll('table').forEach(table => {
+    const tbody = table.querySelector('tbody');
+    if (tbody && !table.querySelector('thead')) {
+      const firstRow = tbody.querySelector('tr');
+      if (firstRow) {
+        // Create thead and move first row into it
+        const thead = document.createElement('thead');
+        firstRow.remove();
+        
+        // Convert td elements to th in the header row
+        firstRow.querySelectorAll('td').forEach(td => {
+          const th = document.createElement('th');
+          th.innerHTML = td.innerHTML;
+          // Copy only rowspan/colspan attributes (GFM doesn't support these well, but preserve them)
+          if (td.hasAttribute('rowspan')) th.setAttribute('rowspan', td.getAttribute('rowspan'));
+          if (td.hasAttribute('colspan')) th.setAttribute('colspan', td.getAttribute('colspan'));
+          td.replaceWith(th);
+        });
+        
+        thead.appendChild(firstRow);
+        table.insertBefore(thead, tbody);
+      }
+    }
+  });
+  
+  return temp.innerHTML;
+};
+
 // Convert HTML to Markdown
-const htmlToMarkdown = (html) => turndownService.turndown(html);
+const htmlToMarkdown = (html) => {
+  const cleanedHtml = cleanTableHtml(html);
+  
+  return turndownService.turndown(cleanedHtml);
+};
 
 // Convert Markdown to HTML with GFM tables enabled
 marked.setOptions({
