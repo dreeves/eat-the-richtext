@@ -36,6 +36,17 @@ turndownService.addRule('subscript', {
   replacement: (content) => `<sub>${content}</sub>`
 });
 
+// Preserve superscript and subscript tags
+turndownService.addRule('superscript', {
+  filter: ['sup'],
+  replacement: (content) => `<sup>${content}</sup>`
+});
+
+turndownService.addRule('subscript', {
+  filter: ['sub'],
+  replacement: (content) => `<sub>${content}</sub>`
+});
+
 // Add table support via GFM plugin
 if (window.turndownPluginGfm) {
   const gfm = window.turndownPluginGfm.gfm;
@@ -221,20 +232,17 @@ const cleanTableHtml = (html) => {
     if (tbody && !table.querySelector('thead')) {
       const firstRow = tbody.querySelector('tr');
       if (firstRow) {
-        // Create thead
         const thead = document.createElement('thead');
         
-        // Convert td elements to th in the header row
+        // Convert td to th
         firstRow.querySelectorAll('td').forEach(td => {
           const th = document.createElement('th');
           th.innerHTML = td.innerHTML;
-          // Copy only rowspan/colspan attributes (GFM doesn't support these well, but preserve them)
           if (td.hasAttribute('rowspan')) th.setAttribute('rowspan', td.getAttribute('rowspan'));
           if (td.hasAttribute('colspan')) th.setAttribute('colspan', td.getAttribute('colspan'));
           td.replaceWith(th);
         });
         
-        // Move first row from tbody to thead
         thead.appendChild(firstRow);
         table.insertBefore(thead, tbody);
       }
@@ -256,7 +264,37 @@ marked.setOptions({
   gfm: true,
   breaks: true
 });
-const markdownToHtml = (markdown) => marked.parse(markdown);
+const markdownToHtml = (markdown) => {
+  let html = marked.parse(markdown);
+  
+  // Add colgroup to tables so Quill Better Table doesn't error
+  if (html.includes('<table')) {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    temp.querySelectorAll('table').forEach(table => {
+      if (!table.querySelector('colgroup')) {
+        const firstRow = table.querySelector('tr');
+        if (firstRow) {
+          const cellCount = firstRow.querySelectorAll('td, th').length;
+          const colgroup = document.createElement('colgroup');
+          
+          for (let i = 0; i < cellCount; i++) {
+            const col = document.createElement('col');
+            col.width = 150; // Set as number property
+            colgroup.appendChild(col);
+          }
+          
+          table.insertBefore(colgroup, table.firstChild);
+        }
+      }
+    });
+    
+    html = temp.innerHTML;
+  }
+  
+  return html;
+};
 
 // Sync changes from Quill editor to Markdown textarea
 quill.on('text-change', () => {
