@@ -25,6 +25,17 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
+// Preserve superscript and subscript tags
+turndownService.addRule('superscript', {
+  filter: ['sup'],
+  replacement: (content) => `<sup>${content}</sup>`
+});
+
+turndownService.addRule('subscript', {
+  filter: ['sub'],
+  replacement: (content) => `<sub>${content}</sub>`
+});
+
 // Add table support via GFM plugin
 if (window.turndownPluginGfm) {
   const gfm = window.turndownPluginGfm.gfm;
@@ -210,9 +221,8 @@ const cleanTableHtml = (html) => {
     if (tbody && !table.querySelector('thead')) {
       const firstRow = tbody.querySelector('tr');
       if (firstRow) {
-        // Create thead and move first row into it
+        // Create thead
         const thead = document.createElement('thead');
-        firstRow.remove();
         
         // Convert td elements to th in the header row
         firstRow.querySelectorAll('td').forEach(td => {
@@ -224,6 +234,7 @@ const cleanTableHtml = (html) => {
           td.replaceWith(th);
         });
         
+        // Move first row from tbody to thead
         thead.appendChild(firstRow);
         table.insertBefore(thead, tbody);
       }
@@ -282,7 +293,11 @@ $('markdown').addEventListener(
     const start = $('markdown').selectionStart;
     const end = $('markdown').selectionEnd;
 
-    quill.clipboard.dangerouslyPasteHTML(html);
+    try {
+      quill.clipboard.dangerouslyPasteHTML(html);
+    } catch (error) {
+      console.error('Error pasting markdown to Quill:', error);
+    }
 
     $('markdown').focus();
     $('markdown').setSelectionRange(start, end);

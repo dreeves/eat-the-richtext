@@ -4,7 +4,7 @@ Type or paste text on the left or right side and watch it convert itself on the 
 
 The problem this is solving is, you know how if you copy/paste formatted text (aka rich text aka RTF) into Discord or GitHub or other places that expect plain text, it destroys all the formatting? Which is *mostly* exactly what you want but some things -- in particular italics -- are very important to preserve. Losing the italics can totally change the meaning!
 
-(You also lose sub- and superscripts, the numbers in a numbered list, bullets in an bulleted list, nesting of lists, links, tables, headers/subheaders, blockquotes, code blocks, etc.)
+(You also lose sub- and superscripts, the numbers in a numbered list, bullets in a bulleted list, nesting of lists, links, tables, headers/subheaders, blockquotes, code blocks, etc.)
 
 So now instead of painstakingly putting underscores or stars around the italicized words, renumbering lists, and otherwise markdownifying the lost formatting, you can paste into the left side of this rich text eater and have that done by magic on the right side.
 
