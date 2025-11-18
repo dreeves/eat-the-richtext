@@ -1,3 +1,5 @@
+[this is all AI-generated, from trying to debug problems with tables; probably not useful]
+
 # Quill Better Table Integration
 
 ## Problem

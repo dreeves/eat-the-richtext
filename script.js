@@ -22,7 +22,8 @@ if (window.quillBetterTable) {
 
 const turndownService = new TurndownService({
   headingStyle: 'atx',
-  codeBlockStyle: 'fenced'
+  codeBlockStyle: 'fenced',
+  hr: '---'
 });
 
 // Preserve superscript and subscript tags
@@ -36,15 +37,15 @@ turndownService.addRule('subscript', {
   replacement: (content) => `<sub>${content}</sub>`
 });
 
-// Preserve superscript and subscript tags
-turndownService.addRule('superscript', {
-  filter: ['sup'],
-  replacement: (content) => `<sup>${content}</sup>`
-});
-
-turndownService.addRule('subscript', {
-  filter: ['sub'],
-  replacement: (content) => `<sub>${content}</sub>`
+// Convert paragraphs that are just "---" or "***" to horizontal rules
+turndownService.addRule('horizontalRuleFromParagraph', {
+  filter: (node) => {
+    return node.nodeName === 'P' &&
+           (node.textContent.trim() === '---' ||
+            node.textContent.trim() === '***' ||
+            node.textContent.trim() === '___');
+  },
+  replacement: () => '\n---\n'
 });
 
 // Add table support via GFM plugin
@@ -112,6 +113,17 @@ const modules = {
       }
     },
   }
+};
+
+// Add clipboard matchers for elements Quill doesn't support natively
+modules.clipboard = {
+  matchers: [
+    // Convert <hr> to plain text "---" when pasting
+    ['HR', (node, delta) => {
+      const Delta = Quill.import('delta');
+      return new Delta().insert('\n---\n');
+    }]
+  ]
 };
 
 // Add table support if available
@@ -266,6 +278,9 @@ marked.setOptions({
 });
 const markdownToHtml = (markdown) => {
   let html = marked.parse(markdown);
+
+  // Convert <hr> to paragraph with dashes since Quill doesn't support hr
+  html = html.replace(/<hr\s*\/?>/gi, '<p>---</p>');
 
   // Transform tables for Quill Better Table compatibility
   if (html.includes('<table')) {
