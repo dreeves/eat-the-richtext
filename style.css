@@ -1,40 +1,98 @@
+:root {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #fafafa;
+  --color-border: #e0e0e0;
+  --color-border-hover: #bdbdbd;
+  --color-divider: #d0d0d0;
+  --color-divider-hover: #9e9e9e;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #999999;
+  --color-text-muted: #b0b0b0;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-tooltip-bg: #2d2d2d;
+  --color-modal-overlay: rgba(0, 0, 0, 0.5);
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+
+  --header-height: 42px;
+  --divider-width: 4px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --transition-fast: 150ms ease;
+  --transition-medium: 250ms ease;
+}
+
 body, html {
   margin: 0;
   padding: 0;
   height: 100%;
   overflow: hidden;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .container {
   display: grid;
-  grid-template-columns: 1fr 5px 1fr;
+  grid-template-columns: 1fr var(--divider-width) 1fr;
   height: 100vh;
+  background-color: var(--color-bg-secondary);
 }
 
 .editor-container, .markdown-container {
   overflow: hidden;
   height: 100%;
+  background-color: var(--color-bg-primary);
 }
 
 .markdown {
   width: 100%;
-  height: calc(100% - 42px);
+  height: calc(100% - var(--header-height));
   resize: none;
-  font-family: monospace;
-  font-size: 16px;
-  padding: 20px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: var(--spacing-2xl);
   box-sizing: border-box;
   border: none;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  transition: background-color var(--transition-fast);
+}
+
+.markdown:focus {
+  outline: none;
+  background-color: var(--color-bg-secondary);
 }
 
 .ql-container {
   height: 100%;
   overflow: hidden;
+  font-size: 15px;
+}
+
+.ql-editor {
+  line-height: 1.5;
 }
 
 .ql-toolbar {
   border-radius: 0;
+  border-color: var(--color-border);
+  background-color: var(--color-bg-secondary);
 }
 
 .ql-toolbar button,
@@ -48,14 +106,17 @@ body, html {
 .help-icon[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
-  padding: 5px;
-  border-radius: 3px;
-  background: #333;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-tooltip-bg);
   color: #fff;
   font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
   z-index: 10;
   display: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
 }
 
 .ql-toolbar button[data-tooltip].tooltip-top::after,
@@ -98,83 +159,153 @@ body, html {
 }
 
 .header {
-  height: 42px;
+  height: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid var(--color-border);
   box-sizing: border-box;
-  background-color: #fff; /* Match the background color */
+  background-color: var(--color-bg-primary);
   position: relative;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
 }
 
 .help-icon {
   position: absolute;
-  right: 10px;
+  right: var(--spacing-md);
   cursor: pointer;
   font-size: 20px;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.help-icon:hover {
+  opacity: 1;
+  background-color: var(--color-bg-secondary);
+  transform: scale(1.05);
+}
+
+.help-icon:active {
+  transform: scale(0.95);
 }
 
 .copy-btn {
   position: absolute;
-  left: 10px;
+  left: var(--spacing-md);
   font-size: 20px;
   background: none;
   border: none;
   cursor: pointer;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.copy-btn:hover {
+  opacity: 1;
+  background-color: var(--color-bg-secondary);
+  transform: scale(1.05);
+}
+
+.copy-btn:active {
+  transform: scale(0.95);
 }
 
 .copy-btn:focus {
-  outline: none;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .modal {
-  display: none; 
-  position: fixed; 
-  z-index: 1; 
+  display: none;
+  position: fixed;
+  z-index: 1000;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
   overflow: auto;
-  background-color: rgba(0,0,0,0.4); 
+  background-color: var(--color-modal-overlay);
+  animation: fadeIn var(--transition-fast);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal-content {
-  background-color: #fff;
-  margin: 15% auto;
-  padding: 20px;
-  border: 1px solid #888;
-  width: 80%;
-  max-width: 500px;
+  background-color: var(--color-bg-primary);
+  margin: 10vh auto;
+  padding: var(--spacing-2xl) var(--spacing-2xl) var(--spacing-xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  width: 90%;
+  max-width: 560px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideIn var(--transition-medium);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .close {
-  color: #aaa;
+  color: var(--color-text-muted);
   float: right;
   font-size: 28px;
-  font-weight: bold;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  padding: 0;
+  margin: -4px 0 0 0;
 }
 
 .close:hover,
 .close:focus {
-  color: black;
+  color: var(--color-text-primary);
   text-decoration: none;
-  cursor: pointer;
 }
 
 .divider {
   cursor: col-resize;
-  background-color: #ccc;
+  background-color: var(--color-divider);
+  transition: background-color var(--transition-fast);
+  position: relative;
+}
+
+.divider:hover {
+  background-color: var(--color-divider-hover);
+}
+
+.divider:active {
+  background-color: var(--color-accent);
 }
 
 #version {
-  font-size: 10px;
-  color: #999;
-  margin-left: 10px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-left: var(--spacing-sm);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .copied-message {
-  font-size: 12px;
-  color: #666;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 400;
 }

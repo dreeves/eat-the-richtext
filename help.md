@@ -12,8 +12,32 @@ So now instead of painstakingly putting underscores or stars around the italiciz
 
 <br>&nbsp;<br>
 
-This is free. If you find it useful and want to express your gratitude, maybe sign up for <a href="https://www.beeminder.com" title="Goal tracking with teeth">Beeminder</a>?
+This is free. If you find it useful and want to express your gratitude, maybe sign up for <a href="https://www.beeminder.com" title="Goal tracking with teeth">Beeminder</a>? Or at least use my <a href="https://www.codebuff.com/referrals/ref-146ce36c-53e8-435c-a7f6-e180206dd0ee" title="Codebuff didn't exist when I first made this but it's been helpful in improving it">referral link</a> to sign up for Codebuff?
 
 <br>&nbsp;<br>
 
-*By Daniel Reeves in collaboration with GPT4o which wrote literally all of the code in the initial version in 2024. Thanks to Serine Molecule for help getting Markdown tables (GitHub-flavored markdown style) to work, although maybe it doesn't quite yet. Stay tuned!*
+More backstory <a href="https://www.lesswrong.com/posts/fFu4tZom8twYdEyeD/eat-the-richtext" title="All these things link to each other now">on LessWrong</a>. And the source code is <a href="https://github.com/dreeves/eat-the-richtext" title="So many links. Original blurb on LessWrong, proper LessWrong post, at least two URLs for the hosted tool itself, source on GitHub, source on Replit, ...">on GitHub</a>.
+
+<br>&nbsp;<br>
+
+## Sample Richtext to try pasting in
+
+<ol>
+<li><em>Italics</em> and <strong>bold</strong></li>
+<li>Sub- or superscripts, like <em>a</em><sup>2</sup> + <em>b</em><sup>2</sup> = <em>c</em><sup>2</sup></li>
+<li>The numbers in a numbered list</li>
+<li>The bullets in a bulleted list
+  <ol>
+  <li>Also nesting of lists</li>
+  </ol></li>
+<li>Hyperlinks like <a href="https://eat-the-richtext.dreev.es/">eat-the-richtext</a></li>
+<li><table>
+<tr><th>Tables</th><th>Chairs</th></tr>
+<tr><td>data</td><td>electric</td></tr>
+<tr><td>furniture</td><td></td></tr>
+</table></li>
+<li><h2>Headers</h2> and <h3>subheaders</h3></li>
+<li><blockquote>Blockquotes</blockquote></li>
+<li><s>Strikethrough</s></li>
+<li><code>&lt;Code&gt;</code></li>
+</ol>
