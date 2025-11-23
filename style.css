@@ -65,7 +65,7 @@ body, html {
   resize: none;
   font-family: var(--font-mono);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.4;
   padding: var(--spacing-2xl);
   box-sizing: border-box;
   border: none;
@@ -279,6 +279,10 @@ body, html {
 .close:focus {
   color: var(--color-text-primary);
   text-decoration: none;
+}
+
+#helpContent {
+  line-height: 1.4;
 }
 
 .divider {
