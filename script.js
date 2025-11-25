@@ -417,6 +417,16 @@ window.onclick = (event) => {
   if (event.target == modal) modal.style.display = 'none';
 };
 
+// Close the modal if the user presses Escape
+window.onkeydown = (event) => {
+  if (event.key === 'Escape') {
+    const modal = $('helpModal');
+    if (modal.style.display === 'block') {
+      closeHelp();
+    }
+  }
+};
+
 // Handle drag for both mouse and touch events
 const handleDragStart = (e) => {
   isDragging = true;
