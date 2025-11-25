@@ -10,17 +10,23 @@ So now instead of painstakingly putting underscores or stars around the italiciz
 
 (Or if you're a weirdo who likes WYSIWYG you can use the left side as an editor and see the corresponding markdown on the right. Or vice versa. You can even jump back and forth, like if you forget the markdown syntax for something. Whatever you like!)
 
-<br>&nbsp;<br>
+<br>
 
 This is free. If you find it useful and want to express your gratitude, maybe sign up for <a href="https://www.beeminder.com" title="Goal tracking with teeth">Beeminder</a>? Or at least use my <a href="https://www.codebuff.com/referrals/ref-146ce36c-53e8-435c-a7f6-e180206dd0ee" title="Codebuff didn't exist when I first made this but it's been helpful in improving it">referral link</a> to sign up for Codebuff?
 
-<br>&nbsp;<br>
+<br>
 
 More backstory <a href="https://www.lesswrong.com/posts/fFu4tZom8twYdEyeD/eat-the-richtext" title="All these things link to each other now">on LessWrong</a>. And the source code is <a href="https://github.com/dreeves/eat-the-richtext" title="So many links. Original blurb on LessWrong, proper LessWrong post, at least two URLs for the hosted tool itself, source on GitHub, source on Replit, ...">on GitHub</a>.
 
-<br>&nbsp;<br>
+<br>
 
-## Sample Richtext to try pasting in
+## Other features
+
+Sometimes you paste in text with non-breaking spaces all over the place (at least this happened to me once when copying text from [dynomight.net](https://dynomight.net "Incidentally one of my favorite blogs")). You can tell because the text doesn't wrap correctly. If you press the ✨ button, it fixes the whitespace. Should it do that automatically?
+
+<br>
+
+## Sample richtext to try pasting in
 
 <ol>
 <li><em>Italics</em> and <strong>bold</strong></li>

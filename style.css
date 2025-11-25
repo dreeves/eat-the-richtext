@@ -194,6 +194,27 @@ body, html {
   transform: scale(0.95);
 }
 
+.normalize-btn {
+  position: absolute;
+  right: 48px;
+  cursor: pointer;
+  font-size: 20px;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.normalize-btn:hover {
+  opacity: 1;
+  background-color: var(--color-bg-secondary);
+  transform: scale(1.05);
+}
+
+.normalize-btn:active {
+  transform: scale(0.95);
+}
+
 .copy-btn {
   position: absolute;
   left: var(--spacing-md);

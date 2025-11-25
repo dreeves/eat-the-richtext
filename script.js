@@ -177,6 +177,7 @@ document.querySelectorAll('.ql-toolbar button').forEach((button) => {
 
 // Initialize Tippy.js for copy and help buttons
 tippy('.copy-btn', { content: 'Copy to clipboard' });
+tippy('.normalize-btn', { content: 'Normalize whitespace' });
 tippy('.help-icon', { content: 'What is happening here?' });
 
 let isUpdating = false;
@@ -472,10 +473,38 @@ const copyMarkdown = () => {
   }, 2000);
 };
 
+// Normalize whitespace in markdown text
+const normalizeWhitespace = () => {
+  const textarea = $('markdown');
+  const originalValue = textarea.value;
+
+  // Replace non-breaking spaces with regular spaces
+  let normalized = originalValue.replace(/\u00A0/g, ' ');
+
+  // Only update if something changed
+  if (normalized !== originalValue) {
+    textarea.value = normalized;
+
+    // Trigger input event to sync with richtext
+    const event = new Event('input', { bubbles: true });
+    textarea.dispatchEvent(event);
+
+    // Visual feedback
+    const normalizeButton = document.querySelector('.normalize-btn');
+    const originalContent = normalizeButton.innerHTML;
+    normalizeButton.innerHTML = '✓';
+
+    setTimeout(() => {
+      normalizeButton.innerHTML = originalContent;
+    }, 1000);
+  }
+};
+
 // Expose functions to global scope
 window.showHelp = showHelp;
 window.closeHelp = closeHelp;
 window.copyMarkdown = copyMarkdown;
+window.normalizeWhitespace = normalizeWhitespace;
 
 }; // end initializeApp
 
