@@ -243,6 +243,15 @@ body, html {
   outline-offset: 2px;
 }
 
+.word-count {
+  position: absolute;
+  left: 52px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
 .modal {
   display: none;
   position: fixed;

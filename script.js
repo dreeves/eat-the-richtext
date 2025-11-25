@@ -10,15 +10,12 @@ const initializeApp = (debounceInterval, version) => {
 
 const markdownTextarea = $('markdown');
 
-// Register Quill Better Table module
 if (window.quillBetterTable) {
-  Quill.register({
-    'modules/better-table': window.quillBetterTable
-  }, true);
-  console.log('Quill Better Table module registered');
-} else {
-  console.warn('Quill Better Table not available');
-}
+  Quill.register({'modules/better-table': window.quillBetterTable}, true);
+  //console.log('Quill Better Table module registered');
+} //else {
+  //console.warn('Quill Better Table not available');
+//}
 
 const turndownService = new TurndownService({
   headingStyle: 'atx',
@@ -52,9 +49,9 @@ turndownService.addRule('horizontalRuleFromParagraph', {
 if (window.turndownPluginGfm) {
   const gfm = window.turndownPluginGfm.gfm;
   turndownService.use(gfm);
-  console.log('Table support enabled via GFM plugin');
+  //console.log('Table support enabled via GFM plugin');
 } else {
-  console.error('Turndown GFM plugin not loaded!');
+  //console.error('Turndown GFM plugin not loaded!');
 }
 
 const divider = $('divider');
@@ -182,6 +179,25 @@ tippy('.help-icon', { content: 'What is happening here?' });
 
 let isUpdating = false;
 
+// Update word count (not currently counting emoji as words; see Tallyglot)
+const updateWordCount = () => {
+  const text = markdownTextarea.value.trim();
+  if (false && text === '') { // is this check necessary?
+    const wordCountEl = $('wordCount');
+    if (wordCountEl) wordCountEl.textContent = '0 words';
+    return;
+  }
+
+  // Split by whitespace and filter out punctuation-only tokens
+  const words = text.split(/\s+/).filter(token => /[a-zA-Z0-9]/.test(token));
+  const wordCount = words.length;
+
+  const wordCountEl = $('wordCount');
+  if (true || wordCountEl) { // this check seems unnecessary
+    wordCountEl.textContent = `${wordCount} word${wordCount === 1 ? '' : 's'}`;
+  }
+};
+
 // Load content from local storage
 window.onload = () => {
   const savedHtml = localStorage.getItem('quillContent');
@@ -189,6 +205,7 @@ window.onload = () => {
   if (savedHtml) quill.clipboard.dangerouslyPasteHTML(savedHtml);
   if (savedMarkdown) markdownTextarea.value = savedMarkdown;
   document.getElementById('version').innerText = version;
+  updateWordCount();
 };
 
 // Save content to local storage
@@ -338,20 +355,12 @@ quill.on('text-change', () => {
   if (isUpdating) return;
   isUpdating = true;
   const html = quill.getSemanticHTML();
-  
-  // Debug: log HTML to see what Quill produces
-  if (html.includes('table')) {
-    console.log('HTML from Quill:', html);
-  }
-  
+  //if (html.includes('table')) { console.log('HTML from Quill:', html) }
   const markdown = htmlToMarkdown(html);
-  
-  // Debug: log markdown conversion
-  if (html.includes('table')) {
-    console.log('Markdown output:', markdown);
-  }
-  
+  //if (html.includes('table')) { console.log('Markdown output:', markdown) }
+
   markdownTextarea.value = markdown;
+  updateWordCount();
   saveContent();
   isUpdating = false;
 });
@@ -377,6 +386,7 @@ $('markdown').addEventListener(
     $('markdown').focus();
     $('markdown').setSelectionRange(start, end);
 
+    updateWordCount();
     saveContent();
     isUpdating = false;
   }, debounceInterval)
