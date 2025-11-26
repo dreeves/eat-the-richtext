@@ -6,6 +6,14 @@
 // this still counts as wholly written by ChatGPT.
 const $ = (id) => document.getElementById(id);
 
+// Singular or plural. Eg, splur(0, "cat") returns "0 cats" or for irregular 
+// plurals, eg, splur(1, "child", "children") returns "1 child".
+function splur(n, s, p=null) { return n === 1    ? `${n} ${s}`
+                                    : p === null ? `${n} ${s}s`
+                                    :              `${n} ${p}`
+}
+
+
 const initializeApp = (debounceInterval, version) => {
 
 const markdownTextarea = $('markdown');
@@ -138,7 +146,7 @@ if (window.quillBetterTable) {
   };
 }
 
-const quill = new Quill('#editor', {
+const quill = new Quill('#richtext', {
   theme: 'snow',
   modules: modules
 });
@@ -180,22 +188,12 @@ tippy('.help-icon', { content: 'What is happening here?' });
 let isUpdating = false;
 
 // Update word count (not currently counting emoji as words; see Tallyglot)
-const updateWordCount = () => {
+function updateWordCount() {
   const text = markdownTextarea.value.trim();
-  if (false && text === '') { // is this check necessary?
-    const wordCountEl = $('wordCount');
-    if (wordCountEl) wordCountEl.textContent = '0 words';
-    return;
-  }
-
   // Split by whitespace and filter out punctuation-only tokens
   const words = text.split(/\s+/).filter(token => /[a-zA-Z0-9]/.test(token));
   const wordCount = words.length;
-
-  const wordCountEl = $('wordCount');
-  if (true || wordCountEl) { // this check seems unnecessary
-    wordCountEl.textContent = `${wordCount} word${wordCount === 1 ? '' : 's'}`;
-  }
+  $('wordCount').textContent = splur(wordCount, "word");
 };
 
 // Load content from local storage
