@@ -6,12 +6,19 @@
 // this still counts as wholly written by ChatGPT.
 const $ = (id) => document.getElementById(id);
 
-// Singular or plural. Eg, splur(0, "cat") returns "0 cats" or for irregular 
+// Singular or plural. Eg, splur(0, "cat") returns "0 cats" or for irregular
 // plurals, eg, splur(1, "child", "children") returns "1 child".
 function splur(n, s, p=null) { return n === 1    ? `${n} ${s}`
                                     : p === null ? `${n} ${s}s`
                                     :              `${n} ${p}`
 }
+
+// Replace every Unicode space-separator character (non-breaking spaces and
+// friends) with a plain ascii space, one-for-one, so string lengths and
+// cursor positions are preserved. Invariant: the markdown pane never
+// contains non-ascii spaces; an intentional non-breaking space is written
+// in the markdown as an explicit "&nbsp;".
+const asciiSpaces = (text) => text.replace(/\p{Zs}/gu, ' ');
 
 
 const initializeApp = (debounceInterval, version) => {
@@ -65,6 +72,18 @@ if (window.turndownPluginGfm) {
 const divider = $('divider');
 const container = document.querySelector('.container');
 let isDragging = false;
+
+// Below this viewport width the panes stack vertically and the divider
+// drags up/down instead of left/right. Must match the media query in
+// style.css.
+const stackedLayout = window.matchMedia('(max-width: 700px)');
+
+// Reset any dragged pane sizes when the layout flips between side-by-side
+// and stacked, since a column split makes no sense as a row split.
+stackedLayout.addEventListener('change', () => {
+  container.style.gridTemplateColumns = '';
+  container.style.gridTemplateRows = '';
+});
 
 // Debounce function to limit the rate at which a function can fire.
 const debounce = (func, wait) => {
@@ -182,7 +201,6 @@ document.querySelectorAll('.ql-toolbar button').forEach((button) => {
 
 // Initialize Tippy.js for copy and help buttons
 tippy('.copy-btn', { content: 'Copy to clipboard' });
-tippy('.normalize-btn', { content: 'Normalize whitespace' });
 tippy('.help-icon', { content: 'What is happening here?' });
 
 let isUpdating = false;
@@ -201,7 +219,7 @@ window.onload = () => {
   const savedHtml = localStorage.getItem('quillContent');
   const savedMarkdown = localStorage.getItem('markdownContent');
   if (savedHtml) quill.clipboard.dangerouslyPasteHTML(savedHtml);
-  if (savedMarkdown) markdownTextarea.value = savedMarkdown;
+  if (savedMarkdown) markdownTextarea.value = asciiSpaces(savedMarkdown);
   document.getElementById('version').innerText = version;
   updateWordCount();
 };
@@ -280,11 +298,14 @@ const cleanTableHtml = (html) => {
   return temp.innerHTML;
 };
 
-// Convert HTML to Markdown
+// Convert HTML to Markdown. The asciiSpaces call is load-bearing: Quill's
+// getSemanticHTML converts every ordinary space to "&nbsp;"
+// (https://github.com/slab/quill/issues/4509), which turndown would
+// otherwise pass through as literal U+00A0 characters.
 const htmlToMarkdown = (html) => {
   const cleanedHtml = cleanTableHtml(html);
-  
-  return turndownService.turndown(cleanedHtml);
+
+  return asciiSpaces(turndownService.turndown(cleanedHtml));
 };
 
 // Convert Markdown to HTML with GFM tables enabled
@@ -354,6 +375,7 @@ quill.on('text-change', () => {
   isUpdating = true;
   const html = quill.getSemanticHTML();
   //if (html.includes('table')) { console.log('HTML from Quill:', html) }
+
   const markdown = htmlToMarkdown(html);
   //if (html.includes('table')) { console.log('Markdown output:', markdown) }
 
@@ -369,11 +391,14 @@ $('markdown').addEventListener(
   debounce(() => {
     if (isUpdating) return;
     isUpdating = true;
-    const markdown = $('markdown').value;
-    const html = markdownToHtml(markdown);
-
     const start = $('markdown').selectionStart;
     const end = $('markdown').selectionEnd;
+
+    // Enforce the no-non-ascii-spaces invariant on whatever was typed or
+    // pasted in; asciiSpaces is length-preserving so start/end stay valid.
+    const markdown = asciiSpaces($('markdown').value);
+    $('markdown').value = markdown;
+    const html = markdownToHtml(markdown);
 
     try {
       quill.clipboard.dangerouslyPasteHTML(html);
@@ -428,7 +453,8 @@ window.onkeydown = (event) => {
 // Handle drag for both mouse and touch events
 const handleDragStart = (e) => {
   isDragging = true;
-  document.body.style.cursor = 'col-resize';
+  document.body.style.cursor = stackedLayout.matches ? 'row-resize'
+                                                     : 'col-resize';
 
   document.addEventListener('mousemove', onDragging);
   document.addEventListener('mouseup', stopDragging);
@@ -442,12 +468,18 @@ const handleDragStart = (e) => {
 const onDragging = (e) => {
   if (!isDragging) return;
   const containerRect = container.getBoundingClientRect();
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const offset = clientX - containerRect.left;
-  const percentage = (offset / containerRect.width) * 100;
-
-  container.style.gridTemplateColumns =
-    `${percentage}% 5px ${100 - percentage}%`;
+  const point = e.touches ? e.touches[0] : e;
+  if (stackedLayout.matches) {
+    const percentage =
+      ((point.clientY - containerRect.top) / containerRect.height) * 100;
+    container.style.gridTemplateRows =
+      `${percentage}% var(--divider-width) 1fr`;
+  } else {
+    const percentage =
+      ((point.clientX - containerRect.left) / containerRect.width) * 100;
+    container.style.gridTemplateColumns =
+      `${percentage}% var(--divider-width) 1fr`;
+  }
 };
 
 const stopDragging = () => {
@@ -491,38 +523,10 @@ const copyMarkdown = () => {
   }, 2000);
 };
 
-// Normalize whitespace in markdown text
-const normalizeWhitespace = () => {
-  const textarea = $('markdown');
-  const originalValue = textarea.value;
-
-  // Replace non-breaking spaces with regular spaces
-  let normalized = originalValue.replace(/\u00A0/g, ' ');
-
-  // Only update if something changed
-  if (normalized !== originalValue) {
-    textarea.value = normalized;
-
-    // Trigger input event to sync with richtext
-    const event = new Event('input', { bubbles: true });
-    textarea.dispatchEvent(event);
-
-    // Visual feedback
-    const normalizeButton = document.querySelector('.normalize-btn');
-    const originalContent = normalizeButton.innerHTML;
-    normalizeButton.innerHTML = '✓';
-
-    setTimeout(() => {
-      normalizeButton.innerHTML = originalContent;
-    }, 1000);
-  }
-};
-
 // Expose functions to global scope
 window.showHelp = showHelp;
 window.closeHelp = closeHelp;
 window.copyMarkdown = copyMarkdown;
-window.normalizeWhitespace = normalizeWhitespace;
 
 }; // end initializeApp
 

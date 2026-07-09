@@ -4,7 +4,7 @@ Type or paste text on the left or right side and watch it convert itself on the 
 
 The problem this is solving is, you know how if you copy/paste formatted text (aka rich text aka RTF) into Discord or GitHub or other places that expect plain text, it destroys all the formatting? Which is *mostly* exactly what you want but some things -- in particular italics -- are very important to preserve. Losing the italics can totally change the meaning!
 
-(You also lose sub- and superscripts, the numbers in a numbered list, bullets in a bulleted list, nesting of lists, links, tables, headers/subheaders, blockquotes, code blocks, etc.)
+(You also lose sub- and superscripts, the numbers in a numbered list, bullets in a bulleted list, nesting of lists, links, tables, headers/subheaders, blockquotes, and code blocks.)
 
 So now instead of painstakingly putting underscores or stars around the italicized words, renumbering lists, and otherwise markdownifying the lost formatting, you can paste into the left side of this rich text eater and have that done by magic on the right side.
 
@@ -12,7 +12,7 @@ So now instead of painstakingly putting underscores or stars around the italiciz
 
 <br>
 
-This is free. If you find it useful and want to express your gratitude, maybe sign up for <a href="https://www.beeminder.com" title="Goal tracking with teeth">Beeminder</a>? Or at least use my <a href="https://www.codebuff.com/referrals/ref-146ce36c-53e8-435c-a7f6-e180206dd0ee" title="Codebuff didn't exist when I first made this but it's been helpful in improving it">referral link</a> to sign up for Codebuff?
+This is free. If you find it useful and want to express your gratitude, maybe sign up for <a href="https://www.beeminder.com" title="Goal tracking with teeth">Beeminder</a>?
 
 <br>
 
@@ -20,9 +20,10 @@ More backstory <a href="https://www.lesswrong.com/posts/fFu4tZom8twYdEyeD/eat-th
 
 <br>
 
+
 ## Other features
 
-Sometimes you paste in text with non-breaking spaces all over the place (at least this happened to me once when copying text from [dynomight.net](https://dynomight.net "Incidentally one of my favorite blogs")). You can tell because the text doesn't wrap correctly. If you press the ✨ button, it fixes the whitespace. Should it do that automatically?
+Word count. I think that's it.
 
 <br>
 

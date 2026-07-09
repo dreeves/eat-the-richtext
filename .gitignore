@@ -1,2 +1,5 @@
 .replit
 .replit.backup
+node_modules/
+test-results/
+playwright-report/

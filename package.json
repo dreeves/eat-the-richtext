@@ -1,0 +1,11 @@
+{
+  "name": "eat-the-richtext",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "quals": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
