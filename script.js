@@ -53,6 +53,11 @@ turndownService.addRule('subscript', {
 // default three ("*   item"). Same as turndown's built-in listItem rule
 // except the prefix is shorter and continuation lines are indented by the
 // prefix's actual length so nested lists still align under their parent.
+// WARNING: this duplicates the internals of turndown's listItem rule
+// (turndown has a bulletListMarker option but no spacing option, so an
+// override is the only supported hook). If the pinned turndown version is
+// ever bumped, upstream fixes to its listItem rule won't apply here --
+// re-diff this against upstream's and rerun the list quals.
 turndownService.addRule('listItem', {
   filter: 'li',
   replacement: (content, node, options) => {
