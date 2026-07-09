@@ -37,3 +37,10 @@ gone. Quals live in quals/ (Playwright; run with `npm run quals`). An
 explicit "&nbsp;" typed in the markdown pane is preserved there, but renders
 as a plain space in the richtext preview and degrades to a plain space if
 the richtext side is subsequently edited (Quill limitation, see above).
+
+2026-07-09 (later): All CDN deps now pinned to exact versions (the unpinned
+marked URL was silently serving 15.0.12 via a jsdelivr legacy fallback; now
+pinned at 18.0.6 with the new lib/marked.umd.min.js path). Panes stack
+vertically below 700px viewport width; that breakpoint lives in BOTH
+style.css and script.js (stackedLayout) and must stay in sync. Hosted on
+GitHub Pages from main branch root; CNAME file holds the custom domain.
