@@ -21,7 +21,7 @@ There's no syntax for superscripts in markdown but html is always allowed in mar
 
 # Hosting
 
-This is currently hosted on Replit but I intend to move it to GitHub Pages.
+GitHub Pages.
 There's no backend, just browser localstorage.
 
 <https://eat-the-richtext.dreev.es>

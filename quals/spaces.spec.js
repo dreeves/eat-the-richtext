@@ -8,12 +8,9 @@
 // even when perfectly normal text is typed or pasted on the richtext side.
 
 import { test, expect } from '@playwright/test';
+import { quillEval } from './helpers.js';
 
 const NBSP = ' ';
-
-// Grab the Quill instance from the page (it's scoped inside initializeApp,
-// but Quill.find recovers it from the DOM).
-const quillEval = (fn) => `(${fn})(Quill.find(document.querySelector('#richtext')))`;
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');

@@ -32,6 +32,16 @@ if (window.quillBetterTable) {
   //console.warn('Quill Better Table not available');
 //}
 
+// Quill has no built-in horizontal-rule support, so register an embed blot
+// for <hr>. With this registered, Quill's clipboard converts <hr> elements
+// on paste and getSemanticHTML emits them back out, so both conversion
+// directions just work.
+const BlockEmbed = Quill.import('blots/block/embed');
+class DividerBlot extends BlockEmbed {}
+DividerBlot.blotName = 'divider';
+DividerBlot.tagName = 'hr';
+Quill.register(DividerBlot);
+
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
@@ -167,17 +177,6 @@ const modules = {
   }
 };
 
-// Add clipboard matchers for elements Quill doesn't support natively
-modules.clipboard = {
-  matchers: [
-    // Convert <hr> to plain text "---" when pasting
-    ['HR', (node, delta) => {
-      const Delta = Quill.import('delta');
-      return new Delta().insert('\n---\n');
-    }]
-  ]
-};
-
 // Add table support if available
 if (window.quillBetterTable) {
   modules.table = false;
@@ -230,6 +229,13 @@ document.querySelectorAll('.ql-toolbar button').forEach((button) => {
 // Initialize Tippy.js for copy and help buttons
 tippy('.copy-btn', { content: 'Copy to clipboard' });
 tippy('.help-icon', { content: 'What is happening here?' });
+// TODO: recommended English tooltip: "When on, every newline in the
+// markdown becomes a line break. When off, strict markdown rules apply:
+// a blank line starts a new paragraph and a hard break needs a trailing
+// double-space."
+tippy('.newline-toggle', {
+  content: 'When on, every newline in the markdown is preserved in the richtext. When off, strict markdown rules apply. Use a trailing double space to force a newline in that case.'
+});
 
 let isUpdating = false;
 
@@ -336,16 +342,13 @@ const htmlToMarkdown = (html) => {
   return asciiSpaces(turndownService.turndown(cleanedHtml));
 };
 
-// Convert Markdown to HTML with GFM tables enabled
+// Convert Markdown to HTML with GFM tables enabled. (The breaks option is
+// owned by the newline-mode toggle; see applyNewlineMode.)
 marked.setOptions({
-  gfm: true,
-  breaks: true
+  gfm: true
 });
 const markdownToHtml = (markdown) => {
   let html = marked.parse(markdown);
-
-  // Convert <hr> to paragraph with dashes since Quill doesn't support hr
-  html = html.replace(/<hr\s*\/?>/gi, '<p>---</p>');
 
   // Transform tables for Quill Better Table compatibility
   if (html.includes('<table')) {
@@ -414,34 +417,60 @@ quill.on('text-change', () => {
 });
 
 // Sync changes from Markdown textarea to Quill editor
+const syncMarkdownToQuill = () => {
+  if (isUpdating) return;
+  isUpdating = true;
+  const start = $('markdown').selectionStart;
+  const end = $('markdown').selectionEnd;
+
+  // Enforce the no-non-ascii-spaces invariant on whatever was typed or
+  // pasted in; asciiSpaces is length-preserving so start/end stay valid.
+  const markdown = asciiSpaces($('markdown').value);
+  $('markdown').value = markdown;
+  const html = markdownToHtml(markdown);
+
+  try {
+    quill.clipboard.dangerouslyPasteHTML(html);
+  } catch (error) {
+    console.error('Error pasting markdown to Quill:', error);
+  }
+
+  $('markdown').focus();
+  $('markdown').setSelectionRange(start, end);
+
+  updateWordCount();
+  saveContent();
+  isUpdating = false;
+};
+
 $('markdown').addEventListener(
-  'input',
-  debounce(() => {
-    if (isUpdating) return;
-    isUpdating = true;
-    const start = $('markdown').selectionStart;
-    const end = $('markdown').selectionEnd;
+  'input', debounce(syncMarkdownToQuill, debounceInterval));
 
-    // Enforce the no-non-ascii-spaces invariant on whatever was typed or
-    // pasted in; asciiSpaces is length-preserving so start/end stay valid.
-    const markdown = asciiSpaces($('markdown').value);
-    $('markdown').value = markdown;
-    const html = markdownToHtml(markdown);
+// Newline-mode toggle. Checked ("preserve", the default): every newline in
+// the markdown is a line break, the Discord / GitHub-comments dialect.
+// Unchecked ("strict"): CommonMark semantics -- a blank line starts a new
+// paragraph, a single newline soft-wraps, and a hard break needs a
+// trailing double-space.
+const preserveNewlines = $('preserveNewlines');
 
-    try {
-      quill.clipboard.dangerouslyPasteHTML(html);
-    } catch (error) {
-      console.error('Error pasting markdown to Quill:', error);
-    }
+const applyNewlineMode = () => {
+  marked.setOptions({ breaks: preserveNewlines.checked });
+  // In strict mode each <p> is a true paragraph, so the stylesheet gives
+  // them vertical margins (see .strict-newlines rules).
+  document.body.classList.toggle('strict-newlines',
+                                 !preserveNewlines.checked);
+};
 
-    $('markdown').focus();
-    $('markdown').setSelectionRange(start, end);
+preserveNewlines.addEventListener('change', () => {
+  localStorage.setItem('preserveNewlines', preserveNewlines.checked);
+  applyNewlineMode();
+  syncMarkdownToQuill();
+});
 
-    updateWordCount();
-    saveContent();
-    isUpdating = false;
-  }, debounceInterval)
-);
+// Default is preserve; only an explicitly stored "false" means strict.
+preserveNewlines.checked =
+  localStorage.getItem('preserveNewlines') !== 'false';
+applyNewlineMode();
 
 // Show help modal
 const showHelp = () => {

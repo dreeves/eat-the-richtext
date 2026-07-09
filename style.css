@@ -80,6 +80,41 @@ body, html {
   line-height: 1.5;
 }
 
+/* Quill zeroes all block margins, which makes the preview look like wet
+   laundry. Give block elements typographic breathing room. (Paragraphs are
+   deliberately excluded: Quill represents every single line as a <p>, so
+   spacing them would double-space line-broken text.) */
+.ql-editor h1, .ql-editor h2, .ql-editor h3, .ql-editor h4 {
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+}
+
+.ql-editor blockquote,
+.ql-editor pre,
+.ql-editor ol,
+.ql-editor table {
+  margin-top: 0.6em;
+  margin-bottom: 0.6em;
+}
+
+.ql-editor > :first-child {
+  margin-top: 0;
+}
+
+.ql-editor hr {
+  border: none;
+  border-top: 1px solid var(--color-divider);
+  margin: 1.2em 0;
+}
+
+/* In strict-newlines mode every <p> is a true paragraph (single newlines
+   soft-wrap away), so blank lines in the markdown earn visible vertical
+   whitespace here. In preserve mode each line is its own <p>, so this
+   would double-space everything -- hence the body-class gate. */
+.strict-newlines .ql-editor p {
+  margin-bottom: 0.75em;
+}
+
 /* Markdown pane */
 
 .header {
@@ -142,6 +177,23 @@ body, html {
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.newline-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.newline-toggle input {
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
 }
 
 .copied-message {
@@ -209,6 +261,16 @@ body, html {
   /* 16px inputs keep mobile Safari from zooming in on focus */
   .ql-container.ql-snow, .markdown {
     font-size: 16px;
+  }
+
+  /* Phone-width headers can't fit everything; the version string is the
+     most expendable item, and the title cinches its belt. */
+  #version {
+    display: none;
+  }
+
+  .header-title {
+    font-size: 13px;
   }
 }
 

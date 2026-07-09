@@ -2,8 +2,7 @@
 // doesn't silently break the app's whole reason for existing.
 
 import { test, expect } from '@playwright/test';
-
-const quillEval = (fn) => `(${fn})(Quill.find(document.querySelector('#richtext')))`;
+import { quillEval } from './helpers.js';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -66,6 +65,25 @@ test('numbered items get one space after the period', async ({ page }) => {
     q.formatLine(0, 9, { list: 'ordered' });
   }));
   await expect(page.locator('#markdown')).toHaveValue('1. unus\n2. duo');
+});
+
+// Replicata: type a horizontal rule (---) in the markdown pane.
+// Expectata: the richtext side renders an actual <hr> line, not the
+// literal text "---".
+test('markdown --- becomes a real horizontal rule in richtext', async ({ page }) => {
+  await page.fill('#markdown', 'ante\n\n---\n\npost');
+  await expect(page.locator('.ql-editor hr')).toHaveCount(1);
+});
+
+// Replicata: a horizontal rule in the richtext editor.
+// Expectata: the markdown side renders it as "---" on its own line.
+test('richtext horizontal rule becomes --- in markdown', async ({ page }) => {
+  await page.evaluate(quillEval((q) => {
+    q.insertText(0, 'ante\n');
+    q.insertEmbed(5, 'divider', true);
+    q.insertText(6, 'post\n');
+  }));
+  await expect(page.locator('#markdown')).toHaveValue('ante\n\n---\n\npost');
 });
 
 // Replicata: a bulleted list with a nested sub-item on the richtext side.
