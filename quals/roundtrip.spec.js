@@ -46,3 +46,39 @@ test('heading and blockquote markdown become richtext', async ({ page }) => {
   await expect(page.locator('.ql-editor h2')).toHaveText('Caput');
   await expect(page.locator('.ql-editor blockquote')).toHaveText('Citatum');
 });
+
+// Replicata: a bulleted list on the richtext side.
+// Expectata: markdown bullets are "* item" -- ONE space after the asterisk
+// (turndown's default is three).
+test('bullet items get one space after the asterisk', async ({ page }) => {
+  await page.evaluate(quillEval((q) => {
+    q.insertText(0, 'unus\nduo\n');
+    q.formatLine(0, 9, { list: 'bullet' });
+  }));
+  await expect(page.locator('#markdown')).toHaveValue('* unus\n* duo');
+});
+
+// Replicata: a numbered list on the richtext side.
+// Expectata: markdown items are "1. item" -- one space after the period.
+test('numbered items get one space after the period', async ({ page }) => {
+  await page.evaluate(quillEval((q) => {
+    q.insertText(0, 'unus\nduo\n');
+    q.formatLine(0, 9, { list: 'ordered' });
+  }));
+  await expect(page.locator('#markdown')).toHaveValue('1. unus\n2. duo');
+});
+
+// Replicata: a bulleted list with a nested sub-item on the richtext side.
+// Expectata: the sub-item is indented to align under its parent's text
+// (two spaces for a "* " parent), and the markdown round-trips back to a
+// nested list in richtext.
+test('nested list items stay aligned and round-trip', async ({ page }) => {
+  await page.evaluate(quillEval((q) => {
+    q.insertText(0, 'unus\nduo\n');
+    q.formatLine(0, 9, { list: 'bullet' });
+    q.formatLine(5, 1, { indent: 1 });
+  }));
+  await expect(page.locator('#markdown')).toHaveValue('* unus\n  * duo');
+  await page.fill('#markdown', '* unus\n  * duo');
+  await expect(page.locator('.ql-editor li')).toHaveCount(2);
+});

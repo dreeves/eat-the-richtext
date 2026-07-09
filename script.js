@@ -49,6 +49,29 @@ turndownService.addRule('subscript', {
   replacement: (content) => `<sub>${content}</sub>`
 });
 
+// One space after list markers ("* item", "1. item") instead of turndown's
+// default three ("*   item"). Same as turndown's built-in listItem rule
+// except the prefix is shorter and continuation lines are indented by the
+// prefix's actual length so nested lists still align under their parent.
+turndownService.addRule('listItem', {
+  filter: 'li',
+  replacement: (content, node, options) => {
+    let prefix = options.bulletListMarker + ' ';
+    const parent = node.parentNode;
+    if (parent.nodeName === 'OL') {
+      const start = parent.getAttribute('start');
+      const index = Array.prototype.indexOf.call(parent.children, node);
+      prefix = (start ? Number(start) + index : index + 1) + '. ';
+    }
+    content = content
+      .replace(/^\n+/, '')     // remove leading newlines
+      .replace(/\n+$/, '\n')   // collapse trailing newlines to one
+      .replace(/\n/gm, '\n' + ' '.repeat(prefix.length));
+    return prefix + content +
+           (node.nextSibling && !/\n$/.test(content) ? '\n' : '');
+  }
+});
+
 // Convert paragraphs that are just "---" or "***" to horizontal rules
 turndownService.addRule('horizontalRuleFromParagraph', {
   filter: (node) => {
