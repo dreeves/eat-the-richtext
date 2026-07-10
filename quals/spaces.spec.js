@@ -65,3 +65,43 @@ test('explicit &nbsp; in markdown survives in the markdown pane', async ({ page 
 test('the normalize-whitespace button is gone', async ({ page }) => {
   await expect(page.locator('.normalize-btn')).toHaveCount(0);
 });
+
+// Replicata: multiple consecutive spaces typed on the richtext side.
+// Expectata: they collapse to a single space in the markdown, which is
+// what any markdown renderer would display anyway. (Deliberate extra
+// spaces are written in the markdown as explicit "&nbsp;".)
+// Resultata (pre-fix): the run echoed into the markdown as multiple
+// plain spaces -- markdown that renders differently than it reads.
+test('multiple spaces in richtext collapse to one in markdown', async ({ page }) => {
+  await page.evaluate(quillEval((q) => q.insertText(0, 'A  B   C', 'user')));
+  await expect(page.locator('#markdown')).toHaveValue('A B C');
+});
+
+// Replicata: multiple spaces inside a code block on the richtext side.
+// Expectata: code is preformatted; the run survives verbatim.
+test('multiple spaces in code blocks survive verbatim', async ({ page }) => {
+  await page.evaluate(quillEval((q) => {
+    q.insertText(0, 'a  b\n', 'user');
+    q.formatLine(0, 1, { 'code-block': true });
+  }));
+  await expect(page.locator('#markdown')).toHaveValue('```\na  b\n```');
+});
+
+// Replicata: multiple spaces inside inline code on the richtext side.
+// Expectata: the run survives verbatim inside the backticks.
+test('multiple spaces in inline code survive verbatim', async ({ page }) => {
+  await page.evaluate(quillEval((q) =>
+    q.insertText(0, 'a  b', { code: true })));
+  await expect(page.locator('#markdown')).toHaveValue('`a  b`');
+});
+
+// Replicata: multiple spaces typed on the markdown side.
+// Expectata: the richtext renders them collapsed, like any markdown
+// renderer; the markdown pane keeps the source as typed.
+test('multiple spaces in markdown render collapsed in richtext', async ({ page }) => {
+  await page.fill('#markdown', 'A  B');
+  await expect.poll(() =>
+    page.evaluate(quillEval((q) => q.getText()))
+  ).toBe('A B\n');
+  await expect(page.locator('#markdown')).toHaveValue('A  B');
+});

@@ -66,6 +66,18 @@ Quill.register('formats/softwrap',
                new ClassAttributor('softwrap', 'ql-softwrap',
                                    { scope: Scope.INLINE }));
 
+// Everything leaving the editor -- markdown serialization and rich-text
+// copy -- is DOM surgery on Quill's semantic HTML. domPrep parses once
+// and threads the tree through the given steps (each a plain function of
+// the root element); this runs on every richtext keystroke, so one parse
+// instead of one per step.
+const domPrep = (html, ...steps) => {
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  steps.forEach((step) => step(temp));
+  return temp.innerHTML;
+};
+
 // Rejoin tight-marked lines into a single paragraph with real <br>
 // separators, so that what the editor displays is exactly the structure
 // other apps receive. Processing in reverse document order lets chains
@@ -73,10 +85,8 @@ Quill.register('formats/softwrap',
 // already-merged successor. Empty tight lines are explicit blank lines
 // (the "<br>" convention), not continuations, so they stay separate.
 const TIGHT = 'ql-tight-true';
-const mergeTightLines = (html) => {
-  const temp = document.createElement('div');
-  temp.innerHTML = html;
-  [...temp.querySelectorAll('p.' + TIGHT)].reverse().forEach((p) => {
+const mergeTightLines = (root) => {
+  [...root.querySelectorAll('p.' + TIGHT)].reverse().forEach((p) => {
     p.classList.remove(TIGHT);
     if (p.classList.length === 0) p.removeAttribute('class');
     const next = p.nextElementSibling;
@@ -85,26 +95,37 @@ const mergeTightLines = (html) => {
       next.remove();
     }
   });
-  return temp.innerHTML;
 };
+
+// Softwrap markers are editor-internal; on the way out they become the
+// plain spaces they look like.
+const stripSoftwraps = (root) => {
+  root.querySelectorAll('span.ql-softwrap-true').forEach((s) =>
+    s.replaceWith(...s.childNodes));
+};
+
+// Undo Quill's space->&nbsp; conversion (the NBSP saga) in the given
+// tree. For prose this must happen BEFORE turndown so its standard
+// whitespace collapsing applies; code contexts are excluded there so
+// space runs in code stay byte-exact (they ride through as &nbsp; and the
+// final asciiSpaces restores them one-for-one).
+const despace = (root, exclude) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const n = walker.currentNode;
+    if (exclude === null || n.parentElement.closest(exclude) === null) {
+      n.textContent = asciiSpaces(n.textContent);
+    }
+  }
+};
+const despaceProse = (root) => despace(root, 'pre, code');
+const despaceAll = (root) => despace(root, null);
 
 // Copied or cut richtext leaves the editor with its true structure and
 // ordinary characters: tight lines rejoined into real <br> paragraphs,
-// softwrap markers stripped to the plain spaces they look like, and
-// Quill's space->&nbsp; conversion undone so paste targets get real
-// spaces (the entire NBSP saga, but on the copy exit).
-const exportHtml = (html) => {
-  const temp = document.createElement('div');
-  temp.innerHTML = mergeTightLines(html);
-  temp.querySelectorAll('span.ql-softwrap-true').forEach((s) =>
-    s.replaceWith(...s.childNodes));
-  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) {
-    walker.currentNode.textContent =
-      asciiSpaces(walker.currentNode.textContent);
-  }
-  return temp.innerHTML;
-};
+// softwrap markers stripped, spaces made plain everywhere.
+const exportHtml = (html) =>
+  domPrep(html, mergeTightLines, stripSoftwraps, despaceAll);
 
 const Clipboard = Quill.import('modules/clipboard');
 class MergingClipboard extends Clipboard {
@@ -383,12 +404,7 @@ const saveContent = () => {
 };
 
 // Clean Quill Better Table artifacts from HTML
-const cleanTableHtml = (html) => {
-  if (!html) return html;
-  
-  const temp = document.createElement('div');
-  temp.innerHTML = html;
-  
+const cleanTableHtml = (temp) => {
   // Remove wrapper divs
   temp.querySelectorAll('.quill-better-table-wrapper').forEach(wrapper => {
     wrapper.replaceWith(...wrapper.childNodes);
@@ -440,24 +456,19 @@ const cleanTableHtml = (html) => {
       }
     }
   });
-  
-  return temp.innerHTML;
 };
 
 // Quill's semantic HTML writes code blocks as <pre> holding bare text
 // (framed by separator newlines), but turndown's fenced-code rule only
 // fires on <pre><code>. Canonicalize the shape, trimming the framing
 // newlines so they don't become blank fence lines.
-const wrapPreCode = (html) => {
-  const temp = document.createElement('div');
-  temp.innerHTML = html;
-  temp.querySelectorAll('pre').forEach((pre) => {
+const wrapPreCode = (root) => {
+  root.querySelectorAll('pre').forEach((pre) => {
     if (pre.querySelector('code')) return;
     const code = document.createElement('code');
     code.textContent = pre.textContent.replace(/^\n/, '').replace(/\n$/, '');
     pre.replaceChildren(code);
   });
-  return temp.innerHTML;
 };
 
 // Hollow out softwrap marker spans (their space arrives as &nbsp; from
@@ -465,25 +476,24 @@ const wrapPreCode = (html) => {
 // that whitespace as stray flanking around the newline. A span with
 // anything more than the one space means editing leaked text into it --
 // leave it intact so the degradation path keeps every character.
-const hollowSoftwraps = (html) => {
-  const temp = document.createElement('div');
-  temp.innerHTML = html;
-  temp.querySelectorAll('span.ql-softwrap-true').forEach((s) => {
+const hollowSoftwraps = (root) => {
+  root.querySelectorAll('span.ql-softwrap-true').forEach((s) => {
     if (asciiSpaces(s.textContent) === ' ') s.textContent = '';
   });
-  return temp.innerHTML;
 };
 
-// Convert HTML to Markdown. The asciiSpaces call is load-bearing: Quill's
-// getSemanticHTML converts every ordinary space to "&nbsp;"
-// (https://github.com/slab/quill/issues/4509), which turndown would
-// otherwise pass through as literal U+00A0 characters.
-const htmlToMarkdown = (html) => {
-  const cleanedHtml =
-    cleanTableHtml(wrapPreCode(mergeTightLines(hollowSoftwraps(html))));
-
-  return asciiSpaces(turndownService.turndown(cleanedHtml));
-};
+// Convert HTML to Markdown. despaceProse undoes Quill's space->&nbsp;
+// conversion (https://github.com/slab/quill/issues/4509) for prose ahead
+// of turndown, so turndown's standard whitespace collapsing applies to
+// space runs the way it would to any normal HTML; code contexts keep
+// their &nbsp; disguise through turndown so runs stay byte-exact, and
+// the final asciiSpaces converts those (and anything else non-ascii)
+// one-for-one. hollowSoftwraps must precede despaceProse so markers keep
+// their identity.
+const htmlToMarkdown = (html) =>
+  asciiSpaces(turndownService.turndown(
+    domPrep(html, hollowSoftwraps, despaceProse, mergeTightLines,
+            wrapPreCode, cleanTableHtml)));
 
 // Convert Markdown to HTML with GFM tables enabled. (The breaks option is
 // owned by the newline-mode toggle; see applyNewlineMode.)
