@@ -56,6 +56,16 @@ Quill.register('formats/tight',
                new ClassAttributor('tight', 'ql-tight',
                                    { scope: Scope.BLOCK }));
 
+// "softwrap" marks an ordinary space that stands for a soft line wrap in
+// the markdown source (a single newline that strict mode renders as a
+// space). Riding in the document as a format on a real space, it
+// survives editing at character granularity; serialization emits it back
+// as a newline (see the softwrap turndown rule) and copying strips it to
+// the plain space it looks like.
+Quill.register('formats/softwrap',
+               new ClassAttributor('softwrap', 'ql-softwrap',
+                                   { scope: Scope.INLINE }));
+
 // Rejoin tight-marked lines into a single paragraph with real <br>
 // separators, so that what the editor displays is exactly the structure
 // other apps receive. Processing in reverse document order lets chains
@@ -78,13 +88,29 @@ const mergeTightLines = (html) => {
   return temp.innerHTML;
 };
 
-// Copied or cut richtext must also carry the merged structure; otherwise
-// the clipboard would hold two paragraphs where the pane shows one.
+// Copied or cut richtext leaves the editor with its true structure and
+// ordinary characters: tight lines rejoined into real <br> paragraphs,
+// softwrap markers stripped to the plain spaces they look like, and
+// Quill's space->&nbsp; conversion undone so paste targets get real
+// spaces (the entire NBSP saga, but on the copy exit).
+const exportHtml = (html) => {
+  const temp = document.createElement('div');
+  temp.innerHTML = mergeTightLines(html);
+  temp.querySelectorAll('span.ql-softwrap-true').forEach((s) =>
+    s.replaceWith(...s.childNodes));
+  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    walker.currentNode.textContent =
+      asciiSpaces(walker.currentNode.textContent);
+  }
+  return temp.innerHTML;
+};
+
 const Clipboard = Quill.import('modules/clipboard');
 class MergingClipboard extends Clipboard {
   onCopy(range, isCut) {
     const copied = super.onCopy(range, isCut);
-    return { ...copied, html: mergeTightLines(copied.html) };
+    return { ...copied, html: exportHtml(copied.html) };
   }
 }
 Quill.register('modules/clipboard', MergingClipboard, true);
@@ -93,17 +119,23 @@ const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
   hr: '---',
-  // Empty richtext lines arrive here as blank <p></p> nodes, which turndown
-  // routes past all rules; without this they'd be silently eaten (a blank
-  // markdown line is structure, not content). Serialize them as explicit
-  // "<br>" lines, which marked renders back into empty lines. The
-  // nextSibling check exempts document-final empties -- the trailing
-  // newline is structural, like a file's -- and with it the empty document
-  // serializes to nothing. Other blanks get turndown's default handling.
+  // Turndown routes "blank" nodes past all rules to this handler, and
+  // whitespace-only content counts as blank, so two meaningful things
+  // land here. (1) Softwrap marker spans (their content is a lone space,
+  // rendered &nbsp; by getSemanticHTML): serialize as the newline they
+  // stand for. (2) Empty richtext lines, arriving as blank <p></p>:
+  // serialize as explicit "<br>" lines, which marked renders back into
+  // empty lines; without this they'd be silently eaten (a blank markdown
+  // line is structure, not content). The nextSibling check exempts
+  // document-final empties -- the trailing newline is structural, like a
+  // file's -- and with it the empty document serializes to nothing.
+  // Everything else gets turndown's default blank handling.
   blankReplacement: (content, node) =>
-    node.nodeName === 'P' && node.nextSibling
-      ? '\n\n<br>\n\n'
-      : node.isBlock ? '\n\n' : ''
+    node.nodeName === 'SPAN' && node.classList.contains('ql-softwrap-true')
+      ? '\n'
+      : node.nodeName === 'P' && node.nextSibling
+        ? '\n\n<br>\n\n'
+        : node.isBlock ? '\n\n' : ''
 });
 
 // Preserve superscript and subscript tags
@@ -142,6 +174,21 @@ turndownService.addRule('listItem', {
       .replace(/\n/gm, '\n' + ' '.repeat(prefix.length));
     return prefix + content +
            (node.nextSibling && !/\n$/.test(content) ? '\n' : '');
+  }
+});
+
+// Softwrap markers come back out of the editor as the newlines they stand
+// for. getSemanticHTML renders the marked space as &nbsp; (hence
+// asciiSpaces) and turndown's flanking-whitespace pass can pull a real
+// space out of the span leaving empty content (hence the '' case). If
+// editing ever smuggles extra text into a marker span, degrade to the
+// literal content -- toward a plain space, never data loss.
+turndownService.addRule('softwrap', {
+  filter: (node) => node.nodeName === 'SPAN' &&
+                    node.classList.contains('ql-softwrap-true'),
+  replacement: (content) => {
+    const c = asciiSpaces(content);
+    return c === ' ' || c === '' ? '\n' : content;
   }
 });
 
@@ -299,7 +346,7 @@ tippy('.help-icon', { content: 'What is happening here?' });
 // a blank line starts a new paragraph and a hard break needs a trailing
 // double-space."
 tippy('.newline-toggle', {
-  content: 'When on, every newline in the markdown is preserved in the richtext. When off, strict markdown rules apply. Use a trailing double space to force a newline in that case.'
+  content: 'Markdown newline ⇒ richtext newline. Uncheck for strict markdown, where you get a newline via trailing double space.'
 });
 
 let isUpdating = false;
@@ -397,12 +444,43 @@ const cleanTableHtml = (html) => {
   return temp.innerHTML;
 };
 
+// Quill's semantic HTML writes code blocks as <pre> holding bare text
+// (framed by separator newlines), but turndown's fenced-code rule only
+// fires on <pre><code>. Canonicalize the shape, trimming the framing
+// newlines so they don't become blank fence lines.
+const wrapPreCode = (html) => {
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  temp.querySelectorAll('pre').forEach((pre) => {
+    if (pre.querySelector('code')) return;
+    const code = document.createElement('code');
+    code.textContent = pre.textContent.replace(/^\n/, '').replace(/\n$/, '');
+    pre.replaceChildren(code);
+  });
+  return temp.innerHTML;
+};
+
+// Hollow out softwrap marker spans (their space arrives as &nbsp; from
+// getSemanticHTML, or as a real space via canon); turndown would re-emit
+// that whitespace as stray flanking around the newline. A span with
+// anything more than the one space means editing leaked text into it --
+// leave it intact so the degradation path keeps every character.
+const hollowSoftwraps = (html) => {
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  temp.querySelectorAll('span.ql-softwrap-true').forEach((s) => {
+    if (asciiSpaces(s.textContent) === ' ') s.textContent = '';
+  });
+  return temp.innerHTML;
+};
+
 // Convert HTML to Markdown. The asciiSpaces call is load-bearing: Quill's
 // getSemanticHTML converts every ordinary space to "&nbsp;"
 // (https://github.com/slab/quill/issues/4509), which turndown would
 // otherwise pass through as literal U+00A0 characters.
 const htmlToMarkdown = (html) => {
-  const cleanedHtml = cleanTableHtml(mergeTightLines(html));
+  const cleanedHtml =
+    cleanTableHtml(wrapPreCode(mergeTightLines(hollowSoftwraps(html))));
 
   return asciiSpaces(turndownService.turndown(cleanedHtml));
 };
@@ -413,14 +491,43 @@ marked.setOptions({
   gfm: true
 });
 const markdownToHtml = (markdown) => {
-  let html = marked.parse(markdown);
+  const temp = document.createElement('div');
+  temp.innerHTML = marked.parse(markdown);
+
+  // Soft wraps -- newlines inside paragraph or list-item text, which
+  // strict mode renders as spaces -- become softwrap-marked spaces so
+  // they survive the trip through the editor (see the softwrap
+  // attributor). A block-edge newline with no inline sibling beside it
+  // is html formatting, not a wrap, and is dropped.
+  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_TEXT);
+  const wrappable = [];
+  while (walker.nextNode()) {
+    const n = walker.currentNode;
+    if (n.textContent.includes('\n') &&
+        n.parentElement.closest('p, li') !== null &&
+        n.parentElement.closest('pre') === null) {
+      wrappable.push(n);
+    }
+  }
+  wrappable.forEach((n) => {
+    const parts = n.textContent.split('\n');
+    if (parts[0] === '' && n.previousSibling === null) parts.shift();
+    if (parts[parts.length - 1] === '' && n.nextSibling === null) parts.pop();
+    const frag = document.createDocumentFragment();
+    parts.forEach((part, i) => {
+      if (i > 0) {
+        const wrap = document.createElement('span');
+        wrap.className = 'ql-softwrap-true';
+        wrap.textContent = ' ';
+        frag.appendChild(wrap);
+      }
+      frag.appendChild(document.createTextNode(part));
+    });
+    n.replaceWith(frag);
+  });
 
   // Transform tables for Quill Better Table compatibility
-  if (html.includes('<table')) {
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-
-    temp.querySelectorAll('table').forEach(table => {
+  temp.querySelectorAll('table').forEach(table => {
       // Convert thead to tbody (Better Table doesn't use thead)
       const thead = table.querySelector('thead');
       if (thead) {
@@ -472,26 +579,80 @@ const markdownToHtml = (markdown) => {
         });
     });
 
-    html = temp.innerHTML;
-  }
-
-  return html;
+  return temp.innerHTML;
 };
 
-// Sync changes from Quill editor to Markdown textarea
+// Reconcile regenerated markdown with what's already in the pane: blocks
+// whose meaning didn't change keep the user's exact source text (soft
+// wraps, emphasis-marker style, blank-line runs, fence style), and only
+// genuinely changed blocks take the regenerated canonical text. The pane
+// itself is the only state. Blocks are compared by canonical form --
+// equal canonical strings render identically by construction -- so the
+// two panes can never diverge semantically.
+//
+// canon() results are memoized because this runs on every richtext
+// keystroke; the cache is cleared on newline-mode changes since the
+// canonical form is mode-dependent (see applyNewlineMode).
+const canonCache = new Map();
+const canon = (block) => {
+  if (!canonCache.has(block)) {
+    canonCache.set(block, htmlToMarkdown(markdownToHtml(block)));
+  }
+  return canonCache.get(block);
+};
+
+// Split markdown into block-level chunks whose raw strings exactly tile
+// the source (so code fences and lists can't be mis-split the way a
+// blank-line regex would). Anything else is a bug we want to hear about
+// immediately.
+const blockRaws = (text) => {
+  const raws = marked.lexer(text).map((t) => t.raw);
+  if (raws.join('') !== text) {
+    throw new Error('marked.lexer tokens do not tile the source');
+  }
+  return raws;
+};
+
+// Whitespace-only chunks (blank-line runs between blocks) all match each
+// other, so the pane's spacing wins wherever the surrounding blocks match.
+const blockKey = (raw) => raw.trim() === '' ? '<gap>' : canon(raw);
+
+const reconcile = (paneText, canonText) => {
+  if (paneText === canonText) return paneText;
+  const pane = blockRaws(paneText);
+  const gen = blockRaws(canonText);
+  let pre = 0;
+  while (pre < pane.length && pre < gen.length &&
+         blockKey(pane[pre]) === blockKey(gen[pre])) pre++;
+  let post = 0;
+  while (post < pane.length - pre && post < gen.length - pre &&
+         blockKey(pane[pane.length - 1 - post]) ===
+         blockKey(gen[gen.length - 1 - post])) post++;
+  return pane.slice(0, pre).join('') +
+         gen.slice(pre, gen.length - post).join('') +
+         pane.slice(pane.length - post).join('');
+};
+
+// Sync changes from Quill editor to Markdown textarea. The finally is
+// lock hygiene: if conversion ever throws (e.g. the tiling assert in
+// blockRaws), the error must stay loud on every keystroke instead of
+// wedging isUpdating and silently killing both sync directions.
 quill.on('text-change', () => {
   if (isUpdating) return;
   isUpdating = true;
-  const html = quill.getSemanticHTML();
-  //if (html.includes('table')) { console.log('HTML from Quill:', html) }
+  try {
+    const html = quill.getSemanticHTML();
+    //if (html.includes('table')) { console.log('HTML from Quill:', html) }
 
-  const markdown = htmlToMarkdown(html);
-  //if (html.includes('table')) { console.log('Markdown output:', markdown) }
+    const markdown = htmlToMarkdown(html);
+    //if (html.includes('table')) { console.log('Markdown output:', markdown) }
 
-  markdownTextarea.value = markdown;
-  updateWordCount();
-  saveContent();
-  isUpdating = false;
+    markdownTextarea.value = reconcile(markdownTextarea.value, markdown);
+    updateWordCount();
+    saveContent();
+  } finally {
+    isUpdating = false;
+  }
 });
 
 // Sync changes from Markdown textarea to Quill editor
@@ -532,6 +693,7 @@ $('markdown').addEventListener(
 const preserveNewlines = $('preserveNewlines');
 
 const applyNewlineMode = () => {
+  canonCache.clear(); // canonical forms are newline-mode-dependent
   marked.setOptions({ breaks: preserveNewlines.checked });
   // Serialize hard breaks (<br>) the way the current dialect writes them:
   // a bare newline in preserve mode, trailing double-space in strict mode.

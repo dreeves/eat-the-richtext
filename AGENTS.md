@@ -44,3 +44,19 @@ pinned at 18.0.6 with the new lib/marked.umd.min.js path). Panes stack
 vertically below 700px viewport width; that breakpoint lives in BOTH
 style.css and script.js (stackedLayout) and must stay in sync. Hosted on
 GitHub Pages from main branch root; CNAME file holds the custom domain.
+
+2026-07-10: Source-formatting preservation is two layers ("belt and
+suspenders"): reconcile() keeps the user's exact markdown for blocks whose
+canonical form didn't change (the pane is the only state), and softwrap
+markers (formatted spaces, parallel to the tight block attribute) let soft
+wraps survive edits even inside the edited block. All exits from the
+editor go through mergeTightLines/hollowSoftwraps/exportHtml so markdown,
+copies, and canon() agree. Degradation is monotone by design: marker ->
+plain space, reconcile -> canonical reflow, never divergence. Turndown
+routes whitespace-only nodes to blankReplacement (NOT rules) -- both the
+empty-line "<br>" convention and softwrap markers live there. Known wart:
+typing at the start of a continuation line inherits the marker format and
+degrades that one wrap to a space (safe). Also fixed while qualing:
+richtext code blocks never serialized (Quill emits <pre> without <code>;
+wrapPreCode canonicalizes) and copied HTML carried &nbsp; for every space
+(exportHtml asciifies).
