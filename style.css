@@ -110,9 +110,16 @@ body, html {
 /* In strict-newlines mode every <p> is a true paragraph (single newlines
    soft-wrap away), so blank lines in the markdown earn visible vertical
    whitespace here. In preserve mode each line is its own <p>, so this
-   would double-space everything -- hence the body-class gate. */
+   would double-space everything -- hence the body-class gate. Lines ending
+   in a hard break (trailing double-space) carry ql-tight and stay snug
+   against the next line, which is the visible difference between a forced
+   line break and a blank-line paragraph break. */
 .strict-newlines .ql-editor p {
   margin-bottom: 0.75em;
+}
+
+.strict-newlines .ql-editor p.ql-tight-true {
+  margin-bottom: 0;
 }
 
 /* Markdown pane */

@@ -42,10 +42,68 @@ DividerBlot.blotName = 'divider';
 DividerBlot.tagName = 'hr';
 Quill.register(DividerBlot);
 
+// "tight" marks a line that ends in a hard break (<br>) rather than a
+// paragraph break. Quill flattens both into plain line splits on ingest,
+// so without this marker the distinction is unrecoverable; with it, strict
+// mode's stylesheet can keep hard-broken lines snug against the next line
+// while blank-line paragraphs get vertical margin (see .strict-newlines
+// rules; ClassAttributor suffixes the value, so the DOM class is
+// "ql-tight-true"). The marker is internal to the editor: everything that
+// leaves it goes through mergeTightLines below, so markdown serialization
+// and copied richtext carry real in-paragraph <br> structure.
+const { ClassAttributor, Scope } = Quill.import('parchment');
+Quill.register('formats/tight',
+               new ClassAttributor('tight', 'ql-tight',
+                                   { scope: Scope.BLOCK }));
+
+// Rejoin tight-marked lines into a single paragraph with real <br>
+// separators, so that what the editor displays is exactly the structure
+// other apps receive. Processing in reverse document order lets chains
+// (a<br>b<br>c) collapse with no bookkeeping: every line absorbs an
+// already-merged successor. Empty tight lines are explicit blank lines
+// (the "<br>" convention), not continuations, so they stay separate.
+const TIGHT = 'ql-tight-true';
+const mergeTightLines = (html) => {
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  [...temp.querySelectorAll('p.' + TIGHT)].reverse().forEach((p) => {
+    p.classList.remove(TIGHT);
+    if (p.classList.length === 0) p.removeAttribute('class');
+    const next = p.nextElementSibling;
+    if (p.textContent && next?.nodeName === 'P' && next.textContent) {
+      p.append(document.createElement('br'), ...next.childNodes);
+      next.remove();
+    }
+  });
+  return temp.innerHTML;
+};
+
+// Copied or cut richtext must also carry the merged structure; otherwise
+// the clipboard would hold two paragraphs where the pane shows one.
+const Clipboard = Quill.import('modules/clipboard');
+class MergingClipboard extends Clipboard {
+  onCopy(range, isCut) {
+    const copied = super.onCopy(range, isCut);
+    return { ...copied, html: mergeTightLines(copied.html) };
+  }
+}
+Quill.register('modules/clipboard', MergingClipboard, true);
+
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
-  hr: '---'
+  hr: '---',
+  // Empty richtext lines arrive here as blank <p></p> nodes, which turndown
+  // routes past all rules; without this they'd be silently eaten (a blank
+  // markdown line is structure, not content). Serialize them as explicit
+  // "<br>" lines, which marked renders back into empty lines. The
+  // nextSibling check exempts document-final empties -- the trailing
+  // newline is structural, like a file's -- and with it the empty document
+  // serializes to nothing. Other blanks get turndown's default handling.
+  blankReplacement: (content, node) =>
+    node.nodeName === 'P' && node.nextSibling
+      ? '\n\n<br>\n\n'
+      : node.isBlock ? '\n\n' : ''
 });
 
 // Preserve superscript and subscript tags
@@ -197,6 +255,13 @@ const quill = new Quill('#richtext', {
   modules: modules
 });
 
+// Ingesting a <br> normally yields an anonymous line split; tag the line it
+// terminates with the "tight" marker instead (see the attributor above).
+quill.clipboard.addMatcher('BR', () => {
+  const Delta = Quill.import('delta');
+  return new Delta().insert('\n', { tight: true });
+});
+
 // Add tooltips to Quill toolbar buttons
 const tooltipMap = {
   'ql-bold': 'Bold',
@@ -337,7 +402,7 @@ const cleanTableHtml = (html) => {
 // (https://github.com/slab/quill/issues/4509), which turndown would
 // otherwise pass through as literal U+00A0 characters.
 const htmlToMarkdown = (html) => {
-  const cleanedHtml = cleanTableHtml(html);
+  const cleanedHtml = cleanTableHtml(mergeTightLines(html));
 
   return asciiSpaces(turndownService.turndown(cleanedHtml));
 };
@@ -392,6 +457,19 @@ const markdownToHtml = (markdown) => {
           table.insertBefore(colgroup, table.firstChild);
         }
       }
+
+      // Strip whitespace-only text nodes from the table's structure (cell
+      // contents are untouched): the table module folds inter-element
+      // whitespace into the first cell's text on ingest, and marked puts
+      // newlines between all these tags.
+      [table, ...table.querySelectorAll('thead, tbody, tr, colgroup')]
+        .forEach((el) => {
+          [...el.childNodes].forEach((n) => {
+            if (n.nodeType === Node.TEXT_NODE && n.textContent.trim() === '') {
+              n.remove();
+            }
+          });
+        });
     });
 
     html = temp.innerHTML;
@@ -455,6 +533,10 @@ const preserveNewlines = $('preserveNewlines');
 
 const applyNewlineMode = () => {
   marked.setOptions({ breaks: preserveNewlines.checked });
+  // Serialize hard breaks (<br>) the way the current dialect writes them:
+  // a bare newline in preserve mode, trailing double-space in strict mode.
+  // (Turndown appends "\n" to this.)
+  turndownService.options.br = preserveNewlines.checked ? '' : '  ';
   // In strict mode each <p> is a true paragraph, so the stylesheet gives
   // them vertical margins (see .strict-newlines rules).
   document.body.classList.toggle('strict-newlines',
