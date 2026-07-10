@@ -23,7 +23,10 @@ More backstory <a href="https://www.lesswrong.com/posts/fFu4tZom8twYdEyeD/eat-th
 
 ## Other features
 
-Word count. I think that's it.
+You can choose strict markdown mode where newlines are treated as ordinary whitespace.
+In that mode you can put two trailing spaces at the end of a markdown line to force a newline in the rendered richtext.
+
+Also we show the word count in the header.
 
 <br>
 

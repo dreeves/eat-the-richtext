@@ -155,7 +155,7 @@ const turndownService = new TurndownService({
     node.nodeName === 'SPAN' && node.classList.contains('ql-softwrap-true')
       ? '\n'
       : node.nodeName === 'P' && node.nextSibling
-        ? '\n\n<br>\n\n'
+        ? '\n\n\n\n'  // changed my mind; don't want \n\n<br>\n\n here
         : node.isBlock ? '\n\n' : ''
 });
 
