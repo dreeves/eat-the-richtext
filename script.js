@@ -66,6 +66,18 @@ Quill.register('formats/softwrap',
                new ClassAttributor('softwrap', 'ql-softwrap',
                                    { scope: Scope.INLINE }));
 
+// "hardbreak" marks an ordinary space that stands for a hard line break
+// (<br>) inside a list item. The tight marker can't help there: Quill's
+// model has no in-item line split, so a block-level break inside an <li>
+// would mint a bogus new list item (and getSemanticHTML drops block
+// formats on <li> anyway). Riding as an inline format on a space, like
+// softwrap, the break survives the editor; the stylesheet renders it as
+// a visual line break (see .ql-hardbreak-true) and serialization emits
+// it back as a hard break in the current dialect.
+Quill.register('formats/hardbreak',
+               new ClassAttributor('hardbreak', 'ql-hardbreak',
+                                   { scope: Scope.INLINE }));
+
 // Everything leaving the editor -- markdown serialization and rich-text
 // copy -- is DOM surgery on Quill's semantic HTML. domPrep parses once
 // and threads the tree through the given steps (each a plain function of
@@ -80,21 +92,25 @@ const domPrep = (html, ...steps) => {
 
 // Rejoin tight-marked lines into a single paragraph with real <br>
 // separators, so that what the editor displays is exactly the structure
-// other apps receive. Processing in reverse document order lets chains
-// (a<br>b<br>c) collapse with no bookkeeping: every line absorbs an
-// already-merged successor. Empty tight lines are explicit blank lines
-// (the "<br>" convention), not continuations, so they stay separate.
+// other apps receive. Blockquote lines merge the same way (Quill gives
+// every quoted line its own <blockquote>); the nodeName check keeps
+// merges within one block kind. Processing in reverse document order
+// lets chains (a<br>b<br>c) collapse with no bookkeeping: every line
+// absorbs an already-merged successor. Empty tight lines are explicit
+// blank lines (the "<br>" convention), not continuations, so they stay
+// separate.
 const TIGHT = 'ql-tight-true';
 const mergeTightLines = (root) => {
-  [...root.querySelectorAll('p.' + TIGHT)].reverse().forEach((p) => {
-    p.classList.remove(TIGHT);
-    if (p.classList.length === 0) p.removeAttribute('class');
-    const next = p.nextElementSibling;
-    if (p.textContent && next?.nodeName === 'P' && next.textContent) {
-      p.append(document.createElement('br'), ...next.childNodes);
-      next.remove();
-    }
-  });
+  [...root.querySelectorAll('p.' + TIGHT + ', blockquote.' + TIGHT)]
+    .reverse().forEach((p) => {
+      p.classList.remove(TIGHT);
+      if (p.classList.length === 0) p.removeAttribute('class');
+      const next = p.nextElementSibling;
+      if (p.textContent && next?.nodeName === p.nodeName && next.textContent) {
+        p.append(document.createElement('br'), ...next.childNodes);
+        next.remove();
+      }
+    });
 };
 
 // Softwrap markers are editor-internal; on the way out they become the
@@ -102,6 +118,17 @@ const mergeTightLines = (root) => {
 const stripSoftwraps = (root) => {
   root.querySelectorAll('span.ql-softwrap-true').forEach((s) =>
     s.replaceWith(...s.childNodes));
+};
+
+// Hardbreak markers leave as the real <br> they stand for. A marker
+// holding anything besides its one space means editing leaked text into
+// it -- degrade like a softwrap (keep every character, lose the break).
+const hardbreaksToBr = (root) => {
+  root.querySelectorAll('span.ql-hardbreak-true').forEach((s) => {
+    const c = asciiSpaces(s.textContent);
+    if (c === ' ' || c === '') s.replaceWith(document.createElement('br'));
+    else s.replaceWith(...s.childNodes);
+  });
 };
 
 // Undo Quill's space->&nbsp; conversion (the NBSP saga) in the given
@@ -123,9 +150,10 @@ const despaceAll = (root) => despace(root, null);
 
 // Copied or cut richtext leaves the editor with its true structure and
 // ordinary characters: tight lines rejoined into real <br> paragraphs,
-// softwrap markers stripped, spaces made plain everywhere.
+// hardbreak markers realized as <br>, softwrap markers stripped, spaces
+// made plain everywhere.
 const exportHtml = (html) =>
-  domPrep(html, mergeTightLines, stripSoftwraps, despaceAll);
+  domPrep(html, mergeTightLines, hardbreaksToBr, stripSoftwraps, despaceAll);
 
 const Clipboard = Quill.import('modules/clipboard');
 class MergingClipboard extends Clipboard {
@@ -141,22 +169,26 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced',
   hr: '---',
   // Turndown routes "blank" nodes past all rules to this handler, and
-  // whitespace-only content counts as blank, so two meaningful things
+  // whitespace-only content counts as blank, so three meaningful things
   // land here. (1) Softwrap marker spans (their content is a lone space,
   // rendered &nbsp; by getSemanticHTML): serialize as the newline they
-  // stand for. (2) Empty richtext lines, arriving as blank <p></p>:
+  // stand for. (2) Hardbreak marker spans (same shape): serialize as the
+  // hard break they stand for, written in the current dialect (turndown's
+  // br option). (3) Empty richtext lines, arriving as blank <p></p>:
   // serialize as explicit "<br>" lines, which marked renders back into
   // empty lines; without this they'd be silently eaten (a blank markdown
   // line is structure, not content). The nextSibling check exempts
   // document-final empties -- the trailing newline is structural, like a
   // file's -- and with it the empty document serializes to nothing.
   // Everything else gets turndown's default blank handling.
-  blankReplacement: (content, node) =>
+  blankReplacement: (content, node, options) =>
     node.nodeName === 'SPAN' && node.classList.contains('ql-softwrap-true')
       ? '\n'
-      : node.nodeName === 'P' && node.nextSibling
-        ? '\n\n\n\n'  // changed my mind; don't want \n\n<br>\n\n here
-        : node.isBlock ? '\n\n' : ''
+      : node.nodeName === 'SPAN' && node.classList.contains('ql-hardbreak-true')
+        ? options.br + '\n'
+        : node.nodeName === 'P' && node.nextSibling
+          ? '\n\n\n\n'  // changed my mind; don't want \n\n<br>\n\n here
+          : node.isBlock ? '\n\n' : ''
 });
 
 // Preserve superscript and subscript tags
@@ -210,6 +242,19 @@ turndownService.addRule('softwrap', {
   replacement: (content) => {
     const c = asciiSpaces(content);
     return c === ' ' || c === '' ? '\n' : content;
+  }
+});
+
+// Hardbreak markers, same deal: they come back out as the hard break
+// they stand for, written the way the current dialect writes a <br>
+// (turndown's br option), and degrade to their literal content if
+// editing ever smuggles extra text in.
+turndownService.addRule('hardbreak', {
+  filter: (node) => node.nodeName === 'SPAN' &&
+                    node.classList.contains('ql-hardbreak-true'),
+  replacement: (content, node, options) => {
+    const c = asciiSpaces(content);
+    return c === ' ' || c === '' ? options.br + '\n' : content;
   }
 });
 
@@ -325,9 +370,17 @@ const quill = new Quill('#richtext', {
 
 // Ingesting a <br> normally yields an anonymous line split; tag the line it
 // terminates with the "tight" marker instead (see the attributor above).
-quill.clipboard.addMatcher('BR', () => {
+// Inside a list item a line split would mint a bogus new item -- Quill's
+// model has no block-level break within an <li> -- so there the break
+// ingests as an inline hardbreak marker instead. Exception within the
+// exception: an item with no text at all holds the structural <br> of the
+// empty-line convention, not a break, so it takes the ordinary line split.
+quill.clipboard.addMatcher('BR', (node) => {
   const Delta = Quill.import('delta');
-  return new Delta().insert('\n', { tight: true });
+  const item = node.closest('li');
+  return item !== null && item.textContent.trim() !== ''
+    ? new Delta().insert(' ', { hardbreak: true })
+    : new Delta().insert('\n', { tight: true });
 });
 
 // Add tooltips to Quill toolbar buttons
@@ -471,15 +524,17 @@ const wrapPreCode = (root) => {
   });
 };
 
-// Hollow out softwrap marker spans (their space arrives as &nbsp; from
-// getSemanticHTML, or as a real space via canon); turndown would re-emit
-// that whitespace as stray flanking around the newline. A span with
-// anything more than the one space means editing leaked text into it --
-// leave it intact so the degradation path keeps every character.
-const hollowSoftwraps = (root) => {
-  root.querySelectorAll('span.ql-softwrap-true').forEach((s) => {
-    if (asciiSpaces(s.textContent) === ' ') s.textContent = '';
-  });
+// Hollow out softwrap and hardbreak marker spans (their space arrives as
+// &nbsp; from getSemanticHTML, or as a real space via canon); turndown
+// would re-emit that whitespace as stray flanking around the newline. A
+// span with anything more than the one space means editing leaked text
+// into it -- leave it intact so the degradation path keeps every
+// character.
+const hollowMarkers = (root) => {
+  root.querySelectorAll('span.ql-softwrap-true, span.ql-hardbreak-true')
+    .forEach((s) => {
+      if (asciiSpaces(s.textContent) === ' ') s.textContent = '';
+    });
 };
 
 // Convert HTML to Markdown. despaceProse undoes Quill's space->&nbsp;
@@ -488,11 +543,11 @@ const hollowSoftwraps = (root) => {
 // space runs the way it would to any normal HTML; code contexts keep
 // their &nbsp; disguise through turndown so runs stay byte-exact, and
 // the final asciiSpaces converts those (and anything else non-ascii)
-// one-for-one. hollowSoftwraps must precede despaceProse so markers keep
+// one-for-one. hollowMarkers must precede despaceProse so markers keep
 // their identity.
 const htmlToMarkdown = (html) =>
   asciiSpaces(turndownService.turndown(
-    domPrep(html, hollowSoftwraps, despaceProse, mergeTightLines,
+    domPrep(html, hollowMarkers, despaceProse, mergeTightLines,
             wrapPreCode, cleanTableHtml)));
 
 // Convert Markdown to HTML with GFM tables enabled. (The breaks option is

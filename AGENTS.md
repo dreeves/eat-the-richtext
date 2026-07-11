@@ -45,6 +45,31 @@ vertically below 700px viewport width; that breakpoint lives in BOTH
 style.css and script.js (stackedLayout) and must stay in sync. Hosted on
 GitHub Pages from main branch root; CNAME file holds the custom domain.
 
+2026-07-11: Hard breaks inside list items were minting bogus new items
+("1. a␠␠\nb\n4. c" showed THREE items where GitHub shows two; any
+richtext edit then rewrote the markdown as three renumbered items).
+Root cause: marked gets it right (<li>a<br>b</li>), but the tight-line
+representation can't survive lists -- Quill's model has no in-item line
+split, and getSemanticHTML's convertListHTML emits bare <li> tags,
+dropping block formats (the tight class survives on <p> and even
+<blockquote>, just not <li>). Fix: a third marker, "hardbreak" -- an
+inline format on a space, parallel to softwrap -- carries in-item breaks;
+CSS ::after content '\A' renders it as a visible line break; turndown
+emits it as the current dialect's <br> (via options.br) from both
+blankReplacement (hollowed markers are blank!) and a degradation rule;
+exportHtml realizes it as a real <br> on copy. The BR clipboard matcher
+now branches: br inside an <li> with text -> hardbreak marker; textless
+<li> (the empty-line convention) or anywhere else -> tight line split as
+before. Also fixed the sibling bug: mergeTightLines now merges tight
+blockquote lines too (was p-only), so "> a␠␠\n> b" no longer degrades
+to two quote paragraphs on edit. Quals in quals/hardbreaks.spec.js
+(red/green verified via patch -R). Known wart, same as softwrap: typing
+at the break point can degrade that break to a plain space (safe).
+NOTE: 2 quals were already red before this work (newlines.spec.js:52,
+editing.spec.js:130) -- they still expect the "<br>" blank-line
+convention that 85bff5a ("Changed my mind about br tags") abandoned;
+left for the human to reconcile.
+
 2026-07-10: Source-formatting preservation is two layers ("belt and
 suspenders"): reconcile() keeps the user's exact markdown for blocks whose
 canonical form didn't change (the pane is the only state), and softwrap

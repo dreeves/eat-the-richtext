@@ -122,6 +122,15 @@ body, html {
   margin-bottom: 0;
 }
 
+/* A hardbreak marker (a space standing for a hard break inside a list
+   item; see the attributor in script.js) renders as an actual line
+   break: the generated newline plus white-space:pre forces the wrap,
+   and the marker's own space hides as end-of-line whitespace. */
+.ql-editor span.ql-hardbreak-true::after {
+  content: '\A';
+  white-space: pre;
+}
+
 /* Markdown pane */
 
 .header {
