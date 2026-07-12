@@ -23,6 +23,14 @@ test('Enter in richtext makes a paragraph break in markdown', async ({ page }) =
   await expect(page.locator('#markdown')).toHaveValue('primus\n\nsecundus');
 });
 
+// Replicata: press Enter twice mid-typing, leaving an empty line.
+// Expectata: the empty line lands in the markdown as an extra blank line.
+test('double Enter in richtext makes an extra blank line in markdown', async ({ page }) => {
+  await page.click('.ql-editor');
+  await page.keyboard.type('primus\n\nsecundus');
+  await expect(page.locator('#markdown')).toHaveValue('primus\n\n\n\nsecundus');
+});
+
 // Replicata: click the toolbar bold button, then type.
 // Expectata: the typed text lands bold in the markdown.
 test('toolbar bold during typing lands as ** in markdown', async ({ page }) => {
@@ -124,14 +132,16 @@ test('replacing markdown replaces richtext instead of appending', async ({ page 
   await expect(page.locator('.ql-editor h1')).toHaveCount(0);
 });
 
-// Replicata: markdown with an explicit "<br>" blank line, then edit on the
-// richtext side.
-// Expectata: the explicit blank line survives regeneration.
-test('explicit <br> blank lines survive richtext edits', async ({ page }) => {
+// Replicata: markdown with an old-style explicit "<br>" blank line, then
+// edit on the richtext side.
+// Expectata: the blank line survives regeneration, canonicalized to an
+// extra blank line (the "<br>" convention is retired; see the newlines
+// quals for the blank-line representation).
+test('explicit <br> blank lines canonicalize to extra blank lines on edit', async ({ page }) => {
   await page.fill('#markdown', 'a\n\n<br>\n\nb');
   await expect.poll(() => quillText(page)).toBe('a\n\nb\n');
   await page.evaluate(quillEval((q) => q.insertText(q.getLength() - 1, '!', 'user')));
-  await expect(page.locator('#markdown')).toHaveValue('a\n\n<br>\n\nb!');
+  await expect(page.locator('#markdown')).toHaveValue('a\n\n\n\nb!');
 });
 
 // Replicata: "&nbsp;" entity in markdown, then a richtext edit. This quals

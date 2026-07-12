@@ -40,12 +40,19 @@ test('emphasis-marker style in untouched blocks survives richtext edits', async 
   await expect(page.locator('#markdown')).toHaveValue('*unus*\n\nduo!');
 });
 
-// Replicata: extra blank lines between two paragraphs; edit the second on
-// the richtext side.
-// Expectata: the blank-line run survives verbatim.
+// Replicata: an odd extra newline between two paragraphs (cosmetic
+// spacing -- not enough for an empty line, which takes two); edit the
+// second paragraph on the richtext side.
+// Expectata: the run survives verbatim. (Even runs are semantic -- they
+// render as empty richtext lines and have their own quals in
+// newlines.spec.js -- but they survive edits verbatim all the same.)
 test('extra blank lines between blocks survive richtext edits', async ({ page }) => {
-  await page.fill('#markdown', 'a\n\n\n\nb');
+  await page.fill('#markdown', 'a\n\n\nb');
   await expect.poll(() => quillText(page)).toBe('a\nb\n');
+  await pokeEnd(page);
+  await expect(page.locator('#markdown')).toHaveValue('a\n\n\nb!');
+  await page.fill('#markdown', 'a\n\n\n\nb');
+  await expect.poll(() => quillText(page)).toBe('a\n\nb\n');
   await pokeEnd(page);
   await expect(page.locator('#markdown')).toHaveValue('a\n\n\n\nb!');
 });

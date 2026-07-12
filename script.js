@@ -44,9 +44,9 @@ Quill.register(DividerBlot);
 
 // "tight" marks a line that ends in a hard break (<br>) rather than a
 // paragraph break. Quill flattens both into plain line splits on ingest,
-// so without this marker the distinction is unrecoverable; with it, strict
-// mode's stylesheet can keep hard-broken lines snug against the next line
-// while blank-line paragraphs get vertical margin (see .strict-newlines
+// so without this marker the distinction is unrecoverable; with it, the
+// stylesheet can keep hard-broken lines snug against the next line while
+// blank-line paragraphs get vertical margin (see the .ql-tight-true
 // rules; ClassAttributor suffixes the value, so the DOM class is
 // "ql-tight-true"). The marker is internal to the editor: everything that
 // leaves it goes through mergeTightLines below, so markdown serialization
@@ -97,8 +97,7 @@ const domPrep = (html, ...steps) => {
 // merges within one block kind. Processing in reverse document order
 // lets chains (a<br>b<br>c) collapse with no bookkeeping: every line
 // absorbs an already-merged successor. Empty tight lines are explicit
-// blank lines (the "<br>" convention), not continuations, so they stay
-// separate.
+// blank lines, not continuations, so they stay separate.
 const TIGHT = 'ql-tight-true';
 const mergeTightLines = (root) => {
   [...root.querySelectorAll('p.' + TIGHT + ', blockquote.' + TIGHT)]
@@ -169,26 +168,22 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced',
   hr: '---',
   // Turndown routes "blank" nodes past all rules to this handler, and
-  // whitespace-only content counts as blank, so three meaningful things
+  // whitespace-only content counts as blank, so two meaningful things
   // land here. (1) Softwrap marker spans (their content is a lone space,
   // rendered &nbsp; by getSemanticHTML): serialize as the newline they
   // stand for. (2) Hardbreak marker spans (same shape): serialize as the
   // hard break they stand for, written in the current dialect (turndown's
-  // br option). (3) Empty richtext lines, arriving as blank <p></p>:
-  // serialize as explicit "<br>" lines, which marked renders back into
-  // empty lines; without this they'd be silently eaten (a blank markdown
-  // line is structure, not content). The nextSibling check exempts
-  // document-final empties -- the trailing newline is structural, like a
-  // file's -- and with it the empty document serializes to nothing.
+  // br option). Empty richtext lines never land here: markBlankLines
+  // gives them sentinel content first, because turndown caps block
+  // separators at one blank line and would silently eat them (a blank
+  // markdown line is structure, not content).
   // Everything else gets turndown's default blank handling.
   blankReplacement: (content, node, options) =>
     node.nodeName === 'SPAN' && node.classList.contains('ql-softwrap-true')
       ? '\n'
       : node.nodeName === 'SPAN' && node.classList.contains('ql-hardbreak-true')
         ? options.br + '\n'
-        : node.nodeName === 'P' && node.nextSibling
-          ? '\n\n\n\n'  // changed my mind; don't want \n\n<br>\n\n here
-          : node.isBlock ? '\n\n' : ''
+        : node.isBlock ? '\n\n' : ''
 });
 
 // Preserve superscript and subscript tags
@@ -537,6 +532,31 @@ const hollowMarkers = (root) => {
     });
 };
 
+// An empty richtext line has no direct markdown representation -- a blank
+// markdown line is a block separator, not content -- so empty lines ride
+// out as EXTRA blank lines: each one widens the gap between its neighbors
+// by two newlines ("a\n\n\n\nb" is a, one empty line, b; expandBlankRuns
+// is the inverse). Turndown caps block separators at one blank line and
+// would silently eat blank <p></p>s, so they're marked here with a
+// sentinel character that rides through turndown as ordinary text and is
+// stripped afterward (see htmlToMarkdown). Document-final empties are
+// exempt -- the trailing newline is structural, like a file's -- and with
+// that the empty document serializes to nothing. The sentinel is a
+// private-use codepoint (it must survive an innerHTML round trip, which
+// controls like U+0000 do not) and never appears in real content; if it
+// ever does, crash loudly rather than corrupt.
+const BLANK = '\uE000';
+const markBlankLines = (root) => {
+  if (root.textContent.includes(BLANK)) {
+    throw new Error('blank-line sentinel U+E000 in document content');
+  }
+  [...root.children].forEach((el) => {
+    if (el.nodeName === 'P' && !el.firstChild && el.nextSibling) {
+      el.textContent = BLANK;
+    }
+  });
+};
+
 // Convert HTML to Markdown. despaceProse undoes Quill's space->&nbsp;
 // conversion (https://github.com/slab/quill/issues/4509) for prose ahead
 // of turndown, so turndown's standard whitespace collapsing applies to
@@ -544,11 +564,49 @@ const hollowMarkers = (root) => {
 // their &nbsp; disguise through turndown so runs stay byte-exact, and
 // the final asciiSpaces converts those (and anything else non-ascii)
 // one-for-one. hollowMarkers must precede despaceProse so markers keep
-// their identity.
+// their identity; markBlankLines must follow mergeTightLines so tight
+// merging still sees empty lines as empty.
 const htmlToMarkdown = (html) =>
   asciiSpaces(turndownService.turndown(
     domPrep(html, hollowMarkers, despaceProse, mergeTightLines,
-            wrapPreCode, cleanTableHtml)));
+            wrapPreCode, cleanTableHtml, markBlankLines))
+    .replaceAll(BLANK, ''));
+
+// Split markdown into block-level chunks whose raw strings exactly tile
+// the source (so code fences and lists can't be mis-split the way a
+// blank-line regex would). Anything else is a bug we want to hear about
+// immediately.
+const blockRaws = (text) => {
+  const raws = marked.lexer(text).map((t) => t.raw);
+  if (raws.join('') !== text) {
+    throw new Error('marked.lexer tokens do not tile the source');
+  }
+  return raws;
+};
+
+// How many empty richtext lines a whitespace-only chunk stands for, after
+// paying its structural cost in newlines: two for an ordinary gap between
+// blocks, zero for a leading gap (the document edge separates for free).
+// The remainder maps two newlines to one empty line; an odd straggler is
+// cosmetic source formatting, not content.
+const gapBlanks = (raw, structural = 2) =>
+  Math.max(0, Math.floor(((raw.match(/\n/g) || []).length - structural) / 2));
+
+// The inverse of markBlankLines: blank-line runs in the markdown render
+// as empty richtext lines, one per two newlines beyond the separating
+// pair ("a\n\n\n\nb" is a, one empty line, b). The empty lines are
+// injected as literal <p><br></p> blocks, which marked passes through
+// untouched and Quill ingests as empty lines. A trailing run is
+// structural, like a file's trailing newline, and renders nothing --
+// mirroring markBlankLines' document-final exemption.
+const expandBlankRuns = (markdown) => {
+  const raws = blockRaws(markdown);
+  return raws.map((raw, i) =>
+    raw.trim() !== '' || i === raws.length - 1
+      ? raw
+      : raw + '<p><br></p>\n\n'.repeat(gapBlanks(raw, i === 0 ? 0 : 2))
+  ).join('');
+};
 
 // Convert Markdown to HTML with GFM tables enabled. (The breaks option is
 // owned by the newline-mode toggle; see applyNewlineMode.)
@@ -557,7 +615,7 @@ marked.setOptions({
 });
 const markdownToHtml = (markdown) => {
   const temp = document.createElement('div');
-  temp.innerHTML = marked.parse(markdown);
+  temp.innerHTML = marked.parse(expandBlankRuns(markdown));
 
   // Soft wraps -- newlines inside paragraph or list-item text, which
   // strict mode renders as spaces -- become softwrap-marked spaces so
@@ -666,21 +724,12 @@ const canon = (block) => {
   return canonCache.get(block);
 };
 
-// Split markdown into block-level chunks whose raw strings exactly tile
-// the source (so code fences and lists can't be mis-split the way a
-// blank-line regex would). Anything else is a bug we want to hear about
-// immediately.
-const blockRaws = (text) => {
-  const raws = marked.lexer(text).map((t) => t.raw);
-  if (raws.join('') !== text) {
-    throw new Error('marked.lexer tokens do not tile the source');
-  }
-  return raws;
-};
-
-// Whitespace-only chunks (blank-line runs between blocks) all match each
-// other, so the pane's spacing wins wherever the surrounding blocks match.
-const blockKey = (raw) => raw.trim() === '' ? '<gap>' : canon(raw);
+// Whitespace-only chunks (blank-line runs between blocks) match when they
+// stand for the same number of empty richtext lines, so the pane's spacing
+// wins wherever the runs differ only cosmetically -- an odd extra newline
+// -- and regeneration takes over when the empty lines themselves change.
+const blockKey = (raw) =>
+  raw.trim() === '' ? `<gap${gapBlanks(raw)}>` : canon(raw);
 
 const reconcile = (paneText, canonText) => {
   if (paneText === canonText) return paneText;
@@ -764,8 +813,10 @@ const applyNewlineMode = () => {
   // a bare newline in preserve mode, trailing double-space in strict mode.
   // (Turndown appends "\n" to this.)
   turndownService.options.br = preserveNewlines.checked ? '' : '  ';
-  // In strict mode each <p> is a true paragraph, so the stylesheet gives
-  // them vertical margins (see .strict-newlines rules).
+  // Mark the mode on the body for the stylesheet. Currently no rules use
+  // it -- paragraph spacing became mode-free when the tight marker took
+  // over the distinction -- so this hook is a candidate for removal (with
+  // its qual) if it stays unused.
   document.body.classList.toggle('strict-newlines',
                                  !preserveNewlines.checked);
 };

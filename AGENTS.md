@@ -45,6 +45,34 @@ vertically below 700px viewport width; that breakpoint lives in BOTH
 style.css and script.js (stackedLayout) and must stay in sync. Hosted on
 GitHub Pages from main branch root; CNAME file holds the custom domain.
 
+2026-07-12: The "<br>" blank-line convention is retired (dreev changed
+his mind in 85bff5a; the interim '\n\n\n\n' blankReplacement hack never
+worked because turndown's join() caps block separators at one blank
+line). New convention: an empty richtext line rides out as an EXTRA
+blank line -- each one widens the inter-block gap by two newlines
+("a\n\n\n\nb" is a, one empty line, b; leading runs pay no separator so
+it's two newlines per empty line there; trailing runs are structural
+and render nothing). Serialization: markBlankLines gives empty top-level
+<p>s sentinel content (U+E000, private use -- U+0000 gets eaten by the
+innerHTML round trip) so turndown can't eat them; htmlToMarkdown strips
+the sentinel after. Ingest: expandBlankRuns (lexer-token-based, so code
+fences are safe) injects <p><br></p> per represented empty line; this
+deliberately deviates from CommonMark in strict mode too -- panes must
+agree, and marked's lexer puts ALL inter-block newlines in the space
+token. blockKey now encodes the empty-line count per gap (<gapN>) so
+deleted empty lines can't resurrect from pane spacing; odd stragglers
+stay cosmetic and reconcile-preserved. Also fixed the "squished
+paragraphs" bug: the .strict-newlines gate on paragraph margins predated
+the tight marker and was just suppressing paragraph spacing in preserve
+mode; the margin rules are now mode-free (plus qlbt-cell-line margin 0
+-- cells were getting paragraph spacing in strict mode). The
+strict-newlines body class + its qual are now vestigial (no CSS uses
+it); recommended removal, awaiting dreev. Quals: 3 updated with dreev's
+authorization (newlines "richtext empty lines...", editing "explicit
+<br>...", reconcile "extra blank lines..."), 5 added; red/green verified
+via patch -R; suite fully green (75) for the first time (the 2 stale
+<br>-convention quals were red since 85bff5a).
+
 2026-07-11: Hard breaks inside list items were minting bogus new items
 ("1. a␠␠\nb\n4. c" showed THREE items where GitHub shows two; any
 richtext edit then rewrote the markdown as three renumbered items).

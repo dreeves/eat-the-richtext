@@ -107,18 +107,25 @@ body, html {
   margin: 1.2em 0;
 }
 
-/* In strict-newlines mode every <p> is a true paragraph (single newlines
-   soft-wrap away), so blank lines in the markdown earn visible vertical
-   whitespace here. In preserve mode each line is its own <p>, so this
-   would double-space everything -- hence the body-class gate. Lines ending
-   in a hard break (trailing double-space) carry ql-tight and stay snug
-   against the next line, which is the visible difference between a forced
-   line break and a blank-line paragraph break. */
-.strict-newlines .ql-editor p {
+/* Blank-line paragraph breaks earn visible vertical whitespace in BOTH
+   newline modes. Lines that merely follow a line break -- a single
+   newline in preserve mode, a trailing double-space in strict mode --
+   carry ql-tight and stay snug against the next line, so this only
+   spaces true paragraph boundaries. (These rules were once gated behind
+   the strict-newlines body class on the theory that preserve mode would
+   double-space everything, but that reasoning predates the tight
+   marker.) */
+.ql-editor p {
   margin-bottom: 0.75em;
 }
 
-.strict-newlines .ql-editor p.ql-tight-true {
+.ql-editor p.ql-tight-true {
+  margin-bottom: 0;
+}
+
+/* Table cell lines are lines, not paragraphs (Quill Better Table gives
+   every cell line a <p class="qlbt-cell-line">). */
+.ql-editor p.qlbt-cell-line {
   margin-bottom: 0;
 }
 

@@ -46,12 +46,53 @@ test('strict mode honors hard breaks and paragraph breaks', async ({ page }) => 
 });
 
 // Replicata: an empty line between two lines of text on the richtext side.
-// Expectata: it survives in the markdown as an explicit "<br>" line
-// instead of being silently eaten (blank markdown lines are structural,
-// so a literal blank can't represent it).
-test('richtext empty lines become explicit <br> lines in markdown', async ({ page }) => {
+// Expectata: it survives in the markdown as an extra blank line -- each
+// empty richtext line widens the gap by two newlines beyond the pair
+// that separates the blocks. (This retires the old "<br>" convention;
+// blank markdown lines ARE the representation now.)
+test('richtext empty lines become extra blank lines in markdown', async ({ page }) => {
   await page.evaluate(quillEval((q) => q.insertText(0, 'a\n\nb\n', 'user')));
-  await expect(page.locator('#markdown')).toHaveValue('a\n\n<br>\n\nb');
+  await expect(page.locator('#markdown')).toHaveValue('a\n\n\n\nb');
+});
+
+// Replicata: blank-line runs in the markdown pane.
+// Expectata: two extra newlines render as one empty richtext line, four
+// extra as two; a lone extra newline is cosmetic spacing and renders
+// nothing. Same in strict mode -- a deliberate deviation from CommonMark
+// (which collapses runs), because the panes must agree and an empty
+// richtext line has no other pure-markdown representation.
+test('blank-line runs render as empty richtext lines', async ({ page }) => {
+  await page.fill('#markdown', 'a\n\n\n\nb');
+  await expect.poll(() => quillText(page)).toBe('a\n\nb\n');
+  await page.fill('#markdown', 'a\n\n\n\n\n\nb');
+  await expect.poll(() => quillText(page)).toBe('a\n\n\nb\n');
+  await page.fill('#markdown', 'a\n\n\nb');
+  await expect.poll(() => quillText(page)).toBe('a\nb\n');
+  await page.uncheck('#preserveNewlines');
+  await page.fill('#markdown', 'a\n\n\n\nb');
+  await expect.poll(() => quillText(page)).toBe('a\n\nb\n');
+});
+
+// Replicata: blank lines before the document's first block.
+// Expectata: they render as leading empty lines (no block separation to
+// pay for at the document edge, so two newlines each) and survive a
+// richtext edit.
+test('leading blank lines render and survive edits', async ({ page }) => {
+  await page.fill('#markdown', '\n\na');
+  await expect.poll(() => quillText(page)).toBe('\na\n');
+  await page.evaluate(quillEval((q) => q.insertText(q.getLength() - 1, '!', 'user')));
+  await expect(page.locator('#markdown')).toHaveValue('\n\na!');
+});
+
+// Replicata: delete the empty line between two paragraphs on the richtext
+// side.
+// Expectata: its blank lines leave the markdown too -- the run must not
+// resurrect from the pane's remembered spacing.
+test('deleting an empty richtext line removes its blank lines', async ({ page }) => {
+  await page.fill('#markdown', 'a\n\n\n\nb');
+  await expect.poll(() => quillText(page)).toBe('a\n\nb\n');
+  await page.evaluate(quillEval((q) => q.deleteText(2, 1, 'user')));
+  await expect(page.locator('#markdown')).toHaveValue('a\n\nb');
 });
 
 // Replicata: a "<br>" line in the markdown pane.
@@ -83,6 +124,29 @@ test('strict mode renders hard breaks tighter than paragraph breaks', async ({ p
   const paragraphGap = await lineGap();
   expect(hardBreakGap).toBeLessThan(4);
   expect(paragraphGap).toBeGreaterThan(hardBreakGap + 5);
+});
+
+// Replicata: preserve mode (the default); a line break (single newline)
+// and separately a paragraph break (blank line).
+// Expectata: line-broken lines sit snug; blank-line paragraphs get
+// visible vertical whitespace, just like strict mode. Regression guard
+// for the "squished paragraphs" bug: paragraph spacing was once gated to
+// strict mode on the theory that preserve mode would double-space
+// everything, but single newlines make TIGHT lines here, so the gate
+// only suppressed legitimate paragraph spacing.
+test('preserve mode renders paragraph breaks with visible spacing', async ({ page }) => {
+  const lineGap = () => page.evaluate(() => {
+    const [p1, p2] = document.querySelectorAll('.ql-editor p');
+    return p2.getBoundingClientRect().top - p1.getBoundingClientRect().bottom;
+  });
+  await page.fill('#markdown', 'a\nb');
+  await expect(page.locator('.ql-editor p.ql-tight-true')).toHaveCount(1);
+  const lineBreakGap = await lineGap();
+  await page.fill('#markdown', 'a\n\nb');
+  await expect(page.locator('.ql-editor p.ql-tight-true')).toHaveCount(0);
+  const paragraphGap = await lineGap();
+  expect(lineBreakGap).toBeLessThan(4);
+  expect(paragraphGap).toBeGreaterThan(lineBreakGap + 5);
 });
 
 // Replicata: strict mode, markdown with a hard break, then type on the
