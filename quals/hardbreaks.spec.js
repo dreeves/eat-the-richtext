@@ -39,7 +39,7 @@ test('list hard break plus lazy continuation makes two items, not three', async 
 // Expectata: identical structure -- the trailing double-space is a hard
 // break in both dialects.
 test('strict mode agrees: two items, not three', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', REPORTED);
   await expect(page.locator('.ql-editor li')).toHaveCount(2);
 });
@@ -67,7 +67,7 @@ test('the in-item break is a visible line break', async ({ page }) => {
 // form -- the break survives as a trailing double-space, the continuation
 // is indented under its item, and the misnumbering reflows to 2.
 test('strict-mode list breaks survive richtext edits canonically', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', REPORTED);
   await expect(page.locator('.ql-editor li')).toHaveCount(2);
   await page.evaluate(quillEval((q) => q.insertText(q.getLength() - 1, '!', 'user')));
@@ -117,7 +117,7 @@ test('copied richtext carries in-item breaks as real <br>', async ({ page }) => 
 // Expectata: it ingests as one item with a break, and the markdown is the
 // canonical continuation form.
 test('pasted richtext <br> inside <li> stays one item', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.evaluate(quillEval((q) =>
     q.clipboard.dangerouslyPasteHTML('<ol><li>supra<br>infra</li><li>alter</li></ol>')));
   await expect(page.locator('.ql-editor li')).toHaveCount(2);
@@ -140,7 +140,7 @@ test('empty list items are not mistaken for hard breaks', async ({ page }) => {
 // richtext edit.
 // Expectata: the continuation indents by the bullet prefix's two columns.
 test('bullet-item breaks indent continuations under the bullet', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', '* supra  \ninfra\n* alter');
   await expect(page.locator('.ql-editor li')).toHaveCount(2);
   await page.evaluate(quillEval((q) => q.insertText(q.getLength() - 1, '!', 'user')));
@@ -155,7 +155,7 @@ test('bullet-item breaks indent continuations under the bullet', async ({ page }
 // degrade to a plain space (the softwrap precedent), so the qual pins
 // the safety property: the pane matches one of the two acceptable forms.
 test('typing at the break point never corrupts text', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', '1. supra  \ninfra');
   await expect.poll(() => quillText(page)).toBe('supra infra\n');
   await page.click('.ql-editor');
@@ -171,7 +171,7 @@ test('typing at the break point never corrupts text', async ({ page }) => {
 // Expectata: it stays ONE quote with a hard break instead of splitting
 // into two blank-line-separated quote paragraphs.
 test('blockquote hard breaks survive richtext edits in strict mode', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', '> supra  \n> infra');
   await expect(page.locator('.ql-editor blockquote.ql-tight-true')).toHaveCount(1);
   await page.evaluate(quillEval((q) => q.insertText(q.getLength() - 1, '!', 'user')));

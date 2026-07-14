@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 // paragraph; edit the second one on the richtext side.
 // Expectata: the soft wrap in the untouched paragraph survives verbatim.
 test('soft wraps in untouched blocks survive richtext edits', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', 'line-one\nline-two\n\nalius');
   await expect.poll(() => quillText(page)).toBe('line-one line-two\nalius\n');
   await pokeEnd(page);
@@ -77,7 +77,7 @@ test('code fences survive richtext edits elsewhere', async ({ page }) => {
 // character granularity (see quals/softwrap.spec.js). Here the asterisk
 // emphasis is rewritten to canonical underscores while the wrap survives.
 test('the edited block reflows to canonical text except soft wraps', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', '*primus*\nline-two');
   await expect.poll(() => quillText(page)).toBe('primus line-two\n');
   await pokeEnd(page);

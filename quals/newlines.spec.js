@@ -15,10 +15,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 // Replicata: load the app fresh.
-// Expectata: the toggle defaults to preserve mode, where a single newline
-// is a line break.
+// Expectata: the strict toggle defaults to off, i.e. preserve mode, where
+// a single newline is a line break.
 test('preserve mode is the default and keeps single newlines', async ({ page }) => {
-  await expect(page.locator('#preserveNewlines')).toBeChecked();
+  await expect(page.locator('#strictNewlines')).not.toBeChecked();
   await page.fill('#markdown', 'a\nb');
   await expect.poll(() => quillText(page)).toBe('a\nb\n');
 });
@@ -29,7 +29,7 @@ test('preserve mode is the default and keeps single newlines', async ({ page }) 
 test('strict mode joins single newlines', async ({ page }) => {
   await page.fill('#markdown', 'a\nb');
   await expect.poll(() => quillText(page)).toBe('a\nb\n');
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await expect.poll(() => quillText(page)).toBe('a b\n');
   await expect(page.locator('#markdown')).toHaveValue('a\nb');
 });
@@ -38,7 +38,7 @@ test('strict mode joins single newlines', async ({ page }) => {
 // a blank-line paragraph break.
 // Expectata: both render as two lines in the richtext.
 test('strict mode honors hard breaks and paragraph breaks', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', 'a  \nb');
   await expect.poll(() => quillText(page)).toBe('a\nb\n');
   await page.fill('#markdown', 'a\n\nb');
@@ -68,7 +68,7 @@ test('blank-line runs render as empty richtext lines', async ({ page }) => {
   await expect.poll(() => quillText(page)).toBe('a\n\n\nb\n');
   await page.fill('#markdown', 'a\n\n\nb');
   await expect.poll(() => quillText(page)).toBe('a\nb\n');
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', 'a\n\n\n\nb');
   await expect.poll(() => quillText(page)).toBe('a\n\nb\n');
 });
@@ -113,7 +113,7 @@ test('strict mode renders hard breaks tighter than paragraph breaks', async ({ p
     const [p1, p2] = document.querySelectorAll('.ql-editor p');
     return p2.getBoundingClientRect().top - p1.getBoundingClientRect().bottom;
   });
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', 'a  \nb');
   // Waiting on the tight-marker class rather than the text: both variants
   // produce the same two-line text, so text alone can't signal re-render.
@@ -154,7 +154,7 @@ test('preserve mode renders paragraph breaks with visible spacing', async ({ pag
 // Expectata: the regenerated markdown keeps the trailing-double-space hard
 // break instead of degrading it to a paragraph break.
 test('hard breaks survive richtext edits in strict mode', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.fill('#markdown', 'a  \nb');
   await expect(page.locator('.ql-editor p.ql-tight-true')).toHaveCount(1);
   await page.evaluate(quillEval((q) => q.insertText(q.getLength() - 1, '!', 'user')));
@@ -197,18 +197,24 @@ test('copied richtext carries hard breaks as real <br>', async ({ page }) => {
 // Replicata: switch to strict mode, reload the page.
 // Expectata: the choice sticks.
 test('newline mode persists across reloads', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await page.reload();
   await page.waitForSelector('.ql-editor');
-  await expect(page.locator('#preserveNewlines')).not.toBeChecked();
+  await expect(page.locator('#strictNewlines')).toBeChecked();
 });
 
 // Replicata: toggle between modes.
 // Expectata: strict mode marks the page so the stylesheet can space true
 // paragraphs; preserve mode unmarks it.
 test('strict mode toggles the paragraph-spacing style hook', async ({ page }) => {
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
   await expect(page.locator('body.strict-newlines')).toHaveCount(1);
-  await page.check('#preserveNewlines');
+  await page.uncheck('#strictNewlines');
   await expect(page.locator('body.strict-newlines')).toHaveCount(0);
+});
+
+// Replicata: look at the strict-markdown toggle.
+// Expectata: it's the ruler icon alone, no text label.
+test('the strict toggle is an icon, not text', async ({ page }) => {
+  await expect(page.locator('.strict-toggle')).toHaveText('📏');
 });

@@ -34,19 +34,26 @@
   <div class="markdown-container">
     <div class="header">
       <div class="header-side">
-        <button class="copy-btn" onclick="copyMarkdown()" aria-label="Copy to clipboard">📋</button>
+        <button class="tool copy-btn" onclick="copyMarkdown()" aria-label="Copy to clipboard">📋</button>
         <span class="word-count" id="wordCount"></span>
       </div>
       <span class="header-title">Eat The Richtext <span id="version"></span></span>
       <div class="header-side header-side-right">
-        <label class="newline-toggle">
-          <input type="checkbox" id="preserveNewlines">
-          Newlines
+        <label class="tool xray-toggle">
+          <input type="checkbox" id="xrayToggle" aria-label="X-ray goggles: highlight non-ascii characters and trailing whitespace">
+          <span aria-hidden="true">🥽</span>
         </label>
-        <button class="help-icon" onclick="showHelp()" aria-label="What is happening here?">❓</button>
+        <label class="tool strict-toggle">
+          <input type="checkbox" id="strictNewlines" aria-label="Strict markdown">
+          <span aria-hidden="true">📏</span>
+        </label>
+        <button class="tool help-icon" onclick="showHelp()" aria-label="What is happening here?">❓</button>
       </div>
     </div>
-    <textarea class="markdown" id="markdown" aria-label="Markdown editor"></textarea>
+    <div class="markdown-wrap">
+      <div class="markdown-backdrop" id="backdrop" aria-hidden="true"></div>
+      <textarea class="markdown" id="markdown" aria-label="Markdown editor"></textarea>
+    </div>
   </div>
 </div>
 

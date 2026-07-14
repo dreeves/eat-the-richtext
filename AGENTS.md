@@ -26,6 +26,80 @@ If a symbol (variable, constant, field name, function, etc) is localized to a fe
 
 # Agent Scratchpad (human edits only above this line)
 
+2026-07-13: NBSP audit + non-ascii highlighting. Audit: the no-non-ascii-
+spaces invariant holds in steady state (all three pane-write paths end in
+asciiSpaces) with two empirically confirmed exceptions. (1) Transient
+race: pane input is normalized only by the DEBOUNCED sync, so a richtext
+edit inside that 300ms window runs reconcile against the raw pane text,
+and since canon() asciifies both sides an NBSP block matches its ascii
+twin and is preserved verbatim (and saveContent persists it); the still-
+pending debounce then normalizes, and onload re-normalizes on restore,
+so it self-heals -- exposure is copying inside the window. (2) Durable:
+asciiSpaces is \p{Zs} only, so Cf invisibles (U+FEFF ZWNBSP, U+200B,
+U+2060, bidi controls, U+00AD) survive in the pane permanently; whether
+to also normalize those is an open question for dreev -- for now the
+highlighting (below) makes them visible instead. New feature: every
+non-ascii character in the markdown pane gets a subtle tint (highlighter
+yellow at low alpha -- amber read as error-ish, blue collided with the
+native selection highlight; both vetoed by dreev). Criterion is exactly
+codepoint > 0x7F, no confusables table. Mechanism: .markdown-backdrop
+div behind the (now transparent-background) textarea mirrors its text
+with <mark> per non-ascii run. All programmatic pane writes go through
+setPane (script.js), THE choke point that refreshes the derived views
+(backdrop paint, word count) so they can't go stale; user edits refresh
+the same views via the undebounced 'input' listener (refreshPane). Never
+assign markdownTextarea.value directly. This replaced first-draft
+scattered paintBackdrop calls at each write site (anti-magic violation,
+caught by dreev); the onload if (savedMarkdown) guard collapsed into
+setPane(asciiSpaces(savedMarkdown ?? '')) in the process. Word count
+thereby updates per keystroke now instead of post-debounce.
+Box-shadow ring keeps zero-width chars visible without layout
+cost; trailing <br> keeps backdrop scrollHeight >= textarea's; scroll
+synced in lockstep. CONSTRAINT: textarea and backdrop share one metrics
+rule in style.css (.markdown, .markdown-backdrop) plus the 700px media
+query and scrollbar-gutter: stable on both -- any metric drift misplaces
+highlights. Quals in quals/nonascii.spec.js (red/green verified); full
+suite green. Also visually verified via screenshot (alignment,
+confusable Cyrillic, zero-width sliver).
+
+2026-07-13 (later): X-ray goggles toggle (dreev requested, so the
+anti-settings principle is satisfied). The 🥽 icon-only checkbox in the
+header (label .xray-toggle, input #xrayToggle; grayscale+faded when off)
+gates ALL pane highlighting; on by default, persisted in localStorage
+key xrayGoggles mirroring the preserveNewlines pattern. Second highlight
+kind: trailing whitespace (/[ \t]+$/m per line) in its own soft green
+(--color-trailing) vs non-ascii's yellow. paintBackdrop generalizes to a
+HIGHLIGHTS table of [markClass, regex] kinds; kinds must never overlap
+(these two can't: trailing is ascii-only, nonascii matches no ascii) and
+an assert crashes loudly if a future kind violates that. Marks are
+ALWAYS painted; the toggle only sets .xray-on on the backdrop and CSS
+supplies each kind's --tint (transparent otherwise) -- one paint path
+regardless of mode. Tooltip + aria-label are Latin per the microcopy
+rule, with TO-DO comments carrying the recommended English. Quals added
+to nonascii.spec.js (red/green verified); suite green (86).
+
+2026-07-13 (later still): Newline toggle FLIPPED and iconified per
+dreev: checked now means STRICT markdown (was: checked = preserve).
+Checkbox id preserveNewlines -> strictNewlines, localStorage key
+likewise (deliberately NOT migrated: an old stored preserveNewlines
+value is ignored rather than misread, so prior strict-mode users revert
+to the preserve default once). Icon is 📏 (strictness = rules = ruler).
+Header restyled to echo the Quill toolbar: all four controls (copy,
+goggles, ruler, help) share the .tool class -- 28x24, grayscale+faded
+at rest, full color on hover or when checked, checked toggles also get
+a soft bg chip because some emoji (🥽, 📏) are nearly colorless and
+grayscale-vs-color alone can't carry state. The old .copy-btn/
+.help-icon/.xray-toggle/.newline-toggle CSS collapsed into .tool
+(class names kept in markup as JS/tippy hooks). Dreev adopted the
+goggles English aria-label, so the same copy became the goggles
+tooltip (TO-DOs removed); his old preserve-mode tooltip was made
+backwards by the flip and is retired -- strict toggle has Latin
+tooltip/aria-label with TO-DO English adapted from his original. Quals:
+19 mechanical rewires across hardbreaks/newlines/reconcile/softwrap
+(uncheck preserve -> check strict) + 3 assertion flips in newlines
++ 1 new icon qual, all forced by the dreev-ordered flip; suite green
+(87). Live-verified: strict on joins 'a\nb' to 'a b'.
+
 2026-07-09: Root-caused the NBSP bug. Quill 2.0.3's getSemanticHTML converts
 every ordinary space to "&nbsp;" (https://github.com/slab/quill/issues/4509),
 so the markdown pane filled with U+00A0 regardless of what was pasted.

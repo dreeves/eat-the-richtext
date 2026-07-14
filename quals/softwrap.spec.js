@@ -13,7 +13,7 @@ const quillText = (page) => page.evaluate(quillEval((q) => q.getText()));
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('.ql-editor');
-  await page.uncheck('#preserveNewlines');
+  await page.check('#strictNewlines');
 });
 
 // Replicata: strict mode, one soft-wrapped paragraph; append text at the

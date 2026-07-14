@@ -10,6 +10,13 @@
   --color-text-tertiary: #999999;
   --color-text-muted: #b0b0b0;
   --color-accent: #2563eb;
+  /* X-ray tints. Very subtle highlighter yellow for "this character is
+     non-ascii": blue would collide with the native selection highlight,
+     and warm red-adjacent tints read as errors. Trailing whitespace gets
+     a soft green, distinct from the yellow (a trailing run has no glyph,
+     so its tint block is the whole visual). */
+  --color-nonascii: rgba(255, 220, 0, 0.3);
+  --color-trailing: rgba(16, 185, 129, 0.25);
   --color-modal-overlay: rgba(0, 0, 0, 0.5);
 
   --spacing-xs: 4px;
@@ -160,6 +167,7 @@ body, html {
 
 .header-side-right {
   justify-content: flex-end;
+  gap: var(--spacing-xs); /* a tight icon group, like Quill's ql-formats */
 }
 
 .header-title {
@@ -169,30 +177,58 @@ body, html {
   white-space: nowrap;
 }
 
-.copy-btn, .help-icon {
+/* Header tools: icon-only controls styled to echo the Quill toolbar on
+   the other pane -- same 24px control height, quiet gray at rest, color
+   when engaged. Quill's icons are gray strokes that turn blue on hover;
+   emoji can't take a stroke color, so grayscale-at-rest stands in, and
+   full color plays the "lit up" role: on hover for everything, held for
+   toggles that are on. Buttons and toggle-labels share the class; a
+   toggle's native checkbox is visually hidden but keeps its focus and
+   click behavior. */
+.tool {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  position: relative;
+  min-width: 28px;
+  height: 24px;
+  padding: 0;
+  font-size: 15px;
   line-height: 1;
-  padding: var(--spacing-xs);
   background: none;
   border: none;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
+  user-select: none;
+  filter: grayscale(1);
   opacity: 0.65;
   transition: opacity var(--transition-fast),
-              background-color var(--transition-fast);
+              filter var(--transition-fast);
 }
 
-.copy-btn:hover, .help-icon:hover {
+.tool:hover,
+.tool:has(:checked) {
   opacity: 1;
+  filter: none;
+}
+
+/* Some emoji are nearly colorless, so grayscale-vs-color alone can't
+   carry a toggle's state; an on toggle also sits on a soft chip (the
+   emoji analog of Quill recoloring an active button's strokes). */
+.tool:has(:checked) {
   background-color: var(--color-bg-hover);
 }
 
-.copy-btn:focus-visible, .help-icon:focus-visible {
+.tool:focus-visible,
+.tool:has(:focus-visible) {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
+}
+
+.tool input {
+  position: absolute;
+  opacity: 0;
+  margin: 0;
 }
 
 .word-count, #version {
@@ -202,42 +238,75 @@ body, html {
   white-space: nowrap;
 }
 
-.newline-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-}
-
-.newline-toggle input {
-  margin: 0;
-  accent-color: var(--color-accent);
-  cursor: pointer;
-}
-
 .copied-message {
   font-size: 13px;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
-.markdown {
+.markdown-wrap {
+  position: relative;
+  display: flex;
   flex: 1;
   min-height: 0;
-  width: 100%;
-  resize: none;
+}
+
+/* The backdrop mirrors the textarea's text character-for-character to
+   paint highlights behind it (a textarea can't style ranges), so the two
+   share every metric that affects glyph positions and wrapping. The
+   scrollbar gutter is reserved on both so a scrollbar appearing on the
+   textarea can't change its wrap width out from under the backdrop. */
+.markdown, .markdown-backdrop {
   font-family: var(--font-mono);
   font-size: 15px;
   line-height: 1.4;
   padding: var(--spacing-2xl);
   box-sizing: border-box;
   border: none;
-  background-color: var(--color-bg-primary);
+  margin: 0;
+  scrollbar-gutter: stable;
+}
+
+.markdown {
+  position: relative; /* paints above the backdrop */
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  background-color: transparent;
   color: var(--color-text-primary);
+}
+
+.markdown-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden; /* scrolled from script, in lockstep with the pane */
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  background-color: var(--color-bg-primary);
+  color: transparent;
+}
+
+/* The tint under each highlighted run. The box-shadow ring costs no
+   layout (so alignment holds) and keeps zero-width characters visible.
+   The tint is transparent until the x-ray toggle sets .xray-on on the
+   backdrop and each mark kind supplies its color; the mark's own text
+   stays transparent always (the real glyph above must not double-
+   strike). */
+.markdown-backdrop mark {
+  --tint: transparent;
+  color: transparent;
+  background-color: var(--tint);
+  box-shadow: 0 0 0 1px var(--tint);
+  border-radius: 2px;
+}
+
+.xray-on mark.nonascii {
+  --tint: var(--color-nonascii);
+}
+
+.xray-on mark.trailing {
+  --tint: var(--color-trailing);
 }
 
 .markdown:focus {
@@ -281,8 +350,9 @@ body, html {
     inset: -10px 0;
   }
 
-  /* 16px inputs keep mobile Safari from zooming in on focus */
-  .ql-container.ql-snow, .markdown {
+  /* 16px inputs keep mobile Safari from zooming in on focus (the backdrop
+     tags along to stay in metric lockstep with the pane) */
+  .ql-container.ql-snow, .markdown, .markdown-backdrop {
     font-size: 16px;
   }
 

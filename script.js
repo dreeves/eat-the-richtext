@@ -410,15 +410,61 @@ document.querySelectorAll('.ql-toolbar button').forEach((button) => {
 // Initialize Tippy.js for copy and help buttons
 tippy('.copy-btn', { content: 'Copy to clipboard' });
 tippy('.help-icon', { content: 'What is happening here?' });
-// TODO: recommended English tooltip: "When on, every newline in the
-// markdown becomes a line break. When off, strict markdown rules apply:
-// a blank line starts a new paragraph and a hard break needs a trailing
-// double-space."
-tippy('.newline-toggle', {
-  content: 'Markdown newline ⇒ richtext newline. Uncheck for strict markdown, where you get a newline via trailing double space.'
+tippy('.xray-toggle', {
+  content: 'X-ray goggles: highlight non-ascii characters and trailing whitespace'
+});
+tippy('.strict-toggle', {
+  content: 'Strict markdown: use trailing double space to get a rendered newline. Unstrict means every markdown newline appears as a richtext newline.'
 });
 
 let isUpdating = false;
+
+// Paint the backdrop that highlights every non-ascii character in the
+// markdown pane. "Non-ascii" is the whole criterion -- deliberately
+// simple and total (see AGENTS.md on anti-magic): accented letters,
+// curly quotes, em-dashes, and emoji tint faintly right along with
+// lookalike and invisible characters, rather than some data table
+// deciding which characters count as deceptive. The pane is a textarea,
+// which can't style character ranges, so the highlights live on a
+// backdrop div behind it that mirrors the pane's text exactly (metrics
+// shared in style.css) with <mark> around each non-ascii run; the
+// textarea's transparent background lets the tint show through. The
+// trailing <br> makes a trailing newline in the pane produce a real
+// line box, keeping the backdrop at least as tall as the textarea's
+// scroll range. Runs on every keystroke: O(n) rebuild, all cosmetic,
+// textarea state untouched.
+const backdrop = $('backdrop');
+// Each highlight kind is a mark class (tinted in style.css) plus the
+// regex for its runs. The kinds must never overlap; these two can't,
+// since trailing matches only ascii space/tab and non-ascii matches no
+// ascii at all, and the assert below keeps any future kind honest.
+const HIGHLIGHTS = [
+  ['nonascii', /[^\x00-\x7F]+/g],
+  ['trailing', /[ \t]+$/gm],
+];
+const paintBackdrop = () => {
+  const text = markdownTextarea.value;
+  const runs = HIGHLIGHTS.flatMap(([kind, regex]) =>
+    [...text.matchAll(regex)].map((m) => [m.index, m[0], kind]))
+    .sort((a, b) => a[0] - b[0]);
+  const frag = document.createDocumentFragment();
+  let last = 0;
+  runs.forEach(([index, run, kind]) => {
+    if (index < last) throw new Error('overlapping backdrop highlights');
+    const mark = document.createElement('mark');
+    mark.className = kind;
+    mark.textContent = run;
+    frag.append(text.slice(last, index), mark);
+    last = index + run.length;
+  });
+  frag.append(text.slice(last), document.createElement('br'));
+  backdrop.replaceChildren(frag);
+};
+
+// The backdrop scrolls in lockstep with the pane.
+markdownTextarea.addEventListener('scroll', () => {
+  backdrop.scrollTop = markdownTextarea.scrollTop;
+});
 
 // Update word count (not currently counting emoji as words; see Tallyglot)
 function updateWordCount() {
@@ -429,14 +475,31 @@ function updateWordCount() {
   $('wordCount').textContent = splur(wordCount, "word");
 };
 
+// The pane's derived views (backdrop highlights, word count) refresh
+// together, and the pane's text changes from exactly two sources: user
+// edits, which raise 'input', and programmatic writes, which must all go
+// through setPane. No other code assigns the pane's value -- that's what
+// keeps the views impossible to forget rather than remembered at every
+// write site. Refreshing is undebounced: the highlights sit under the
+// glyphs, so they may never lag the text.
+const refreshPane = () => {
+  paintBackdrop();
+  updateWordCount();
+};
+markdownTextarea.addEventListener('input', refreshPane);
+
+const setPane = (text) => {
+  markdownTextarea.value = text;
+  refreshPane();
+};
+
 // Load content from local storage
 window.onload = () => {
   const savedHtml = localStorage.getItem('quillContent');
   const savedMarkdown = localStorage.getItem('markdownContent');
   if (savedHtml) quill.clipboard.dangerouslyPasteHTML(savedHtml);
-  if (savedMarkdown) markdownTextarea.value = asciiSpaces(savedMarkdown);
+  setPane(asciiSpaces(savedMarkdown ?? ''));
   document.getElementById('version').innerText = version;
-  updateWordCount();
 };
 
 // Save content to local storage
@@ -761,8 +824,7 @@ quill.on('text-change', () => {
     const markdown = htmlToMarkdown(html);
     //if (html.includes('table')) { console.log('Markdown output:', markdown) }
 
-    markdownTextarea.value = reconcile(markdownTextarea.value, markdown);
-    updateWordCount();
+    setPane(reconcile(markdownTextarea.value, markdown));
     saveContent();
   } finally {
     isUpdating = false;
@@ -779,7 +841,7 @@ const syncMarkdownToQuill = () => {
   // Enforce the no-non-ascii-spaces invariant on whatever was typed or
   // pasted in; asciiSpaces is length-preserving so start/end stay valid.
   const markdown = asciiSpaces($('markdown').value);
-  $('markdown').value = markdown;
+  setPane(markdown);
   const html = markdownToHtml(markdown);
 
   try {
@@ -791,7 +853,6 @@ const syncMarkdownToQuill = () => {
   $('markdown').focus();
   $('markdown').setSelectionRange(start, end);
 
-  updateWordCount();
   saveContent();
   isUpdating = false;
 };
@@ -799,38 +860,58 @@ const syncMarkdownToQuill = () => {
 $('markdown').addEventListener(
   'input', debounce(syncMarkdownToQuill, debounceInterval));
 
-// Newline-mode toggle. Checked ("preserve", the default): every newline in
-// the markdown is a line break, the Discord / GitHub-comments dialect.
-// Unchecked ("strict"): CommonMark semantics -- a blank line starts a new
-// paragraph, a single newline soft-wraps, and a hard break needs a
-// trailing double-space.
-const preserveNewlines = $('preserveNewlines');
+// Newline-mode toggle. Checked ("strict"): CommonMark semantics -- a
+// blank line starts a new paragraph, a single newline soft-wraps, and a
+// hard break needs a trailing double-space. Unchecked ("preserve", the
+// default): every newline in the markdown is a line break, the Discord /
+// GitHub-comments dialect. (The toggle meant preserve-when-checked until
+// 2026-07-13; the localStorage key changed with the flip so an old
+// stored preference reverts to the default rather than being misread.)
+const strictNewlines = $('strictNewlines');
 
 const applyNewlineMode = () => {
   canonCache.clear(); // canonical forms are newline-mode-dependent
-  marked.setOptions({ breaks: preserveNewlines.checked });
+  marked.setOptions({ breaks: !strictNewlines.checked });
   // Serialize hard breaks (<br>) the way the current dialect writes them:
-  // a bare newline in preserve mode, trailing double-space in strict mode.
-  // (Turndown appends "\n" to this.)
-  turndownService.options.br = preserveNewlines.checked ? '' : '  ';
+  // trailing double-space in strict mode, a bare newline in preserve
+  // mode. (Turndown appends "\n" to this.)
+  turndownService.options.br = strictNewlines.checked ? '  ' : '';
   // Mark the mode on the body for the stylesheet. Currently no rules use
   // it -- paragraph spacing became mode-free when the tight marker took
   // over the distinction -- so this hook is a candidate for removal (with
   // its qual) if it stays unused.
-  document.body.classList.toggle('strict-newlines',
-                                 !preserveNewlines.checked);
+  document.body.classList.toggle('strict-newlines', strictNewlines.checked);
 };
 
-preserveNewlines.addEventListener('change', () => {
-  localStorage.setItem('preserveNewlines', preserveNewlines.checked);
+strictNewlines.addEventListener('change', () => {
+  localStorage.setItem('strictNewlines', strictNewlines.checked);
   applyNewlineMode();
   syncMarkdownToQuill();
 });
 
-// Default is preserve; only an explicitly stored "false" means strict.
-preserveNewlines.checked =
-  localStorage.getItem('preserveNewlines') !== 'false';
+// Default is preserve; only an explicitly stored "true" means strict.
+strictNewlines.checked = localStorage.getItem('strictNewlines') === 'true';
 applyNewlineMode();
+
+// X-ray goggles toggle: the pane's highlights for what the eye can't
+// otherwise vouch for (non-ascii characters, trailing whitespace). The
+// marks are always painted; the toggle only grants or withholds their
+// tint via the class the stylesheet keys on (see .xray-on), so there is
+// one paint path regardless of mode.
+const xrayToggle = $('xrayToggle');
+
+const applyXray = () => {
+  backdrop.classList.toggle('xray-on', xrayToggle.checked);
+};
+
+xrayToggle.addEventListener('change', () => {
+  localStorage.setItem('xrayGoggles', xrayToggle.checked);
+  applyXray();
+});
+
+// Default is on; only an explicitly stored "false" means off.
+xrayToggle.checked = localStorage.getItem('xrayGoggles') !== 'false';
+applyXray();
 
 // Show help modal
 const showHelp = () => {
