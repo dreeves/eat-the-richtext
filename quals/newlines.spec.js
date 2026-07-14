@@ -218,3 +218,15 @@ test('strict mode toggles the paragraph-spacing style hook', async ({ page }) =>
 test('the strict toggle is an icon, not text', async ({ page }) => {
   await expect(page.locator('.strict-toggle')).toHaveText('📏');
 });
+
+// Replicata: open the help modal while in the default preserve mode.
+// Expectata: help.md is authored as proper markdown, so it renders with
+// strict semantics no matter the pane's newline mode -- its soft-wrapped
+// source lines must not become line breaks.
+test('help renders as strict markdown regardless of newline mode', async ({ page }) => {
+  await page.click('.help-icon');
+  const para = page.locator('#helpContent p')
+    .filter({ hasText: 'strict markdown mode' });
+  await expect(para).toBeVisible();
+  expect(await para.innerHTML()).not.toContain('<br');
+});

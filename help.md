@@ -26,6 +26,8 @@ More backstory <a href="https://www.lesswrong.com/posts/fFu4tZom8twYdEyeD/eat-th
 You can choose strict markdown mode where newlines are treated as ordinary whitespace.
 In that mode you can put two trailing spaces at the end of a markdown line to force a newline in the rendered richtext.
 
+If you want to see trailing whitespace visually, as well as highlight any non-ascii characters, there's an x-ray goggles button for that.
+
 Also we show the word count in the header.
 
 <br>

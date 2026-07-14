@@ -409,7 +409,7 @@ document.querySelectorAll('.ql-toolbar button').forEach((button) => {
 
 // Initialize Tippy.js for copy and help buttons
 tippy('.copy-btn', { content: 'Copy to clipboard' });
-tippy('.help-icon', { content: 'What is happening here?' });
+tippy('.help-icon', { content: 'Help' });
 tippy('.xray-toggle', {
   content: 'X-ray goggles: highlight non-ascii characters and trailing whitespace'
 });
@@ -921,7 +921,11 @@ const showHelp = () => {
       return response.text();
     })
     .then((text) => {
-      $('helpContent').innerHTML = marked.parse(text);
+      // help.md is proper markdown; the global breaks option belongs to
+      // the pane's newline-mode toggle, so it's overridden per-call here
+      // lest preserve mode turn help.md's soft-wrapped source lines into
+      // line breaks.
+      $('helpContent').innerHTML = marked.parse(text, { breaks: false });
       $('helpModal').style.display = 'block';
     })
     .catch((error) => console.error('Error fetching help content:', error));

@@ -100,6 +100,15 @@ tooltip/aria-label with TO-DO English adapted from his original. Quals:
 + 1 new icon qual, all forced by the dreev-ordered flip; suite green
 (87). Live-verified: strict on joins 'a\nb' to 'a b'.
 
+2026-07-13 (help modal): showHelp was parsing help.md with the GLOBAL
+marked options, so the modal inherited the pane's newline mode and
+preserve mode (the default!) rendered help.md's soft-wrapped source
+lines as line breaks. Fixed with a per-call override:
+marked.parse(text, { breaks: false }) -- per-call options merge over
+setOptions defaults, so gfm stays on. help.md's literal <br> spacers
+are unaffected (they're passthrough HTML, not breaks). Qual in
+newlines.spec.js (red/green verified); suite green (88).
+
 2026-07-09: Root-caused the NBSP bug. Quill 2.0.3's getSemanticHTML converts
 every ordinary space to "&nbsp;" (https://github.com/slab/quill/issues/4509),
 so the markdown pane filled with U+00A0 regardless of what was pasted.
