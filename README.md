@@ -27,3 +27,15 @@ There's no backend, just browser localstorage.
 <https://eat-the-richtext.dreev.es>
 
 
+---
+
+Scratch Area:
+
+serine thinks there's bugginess with formatting piling up like 
+> extraneous formatting kinda piles up
+> you Cmd+A Backspace and it still has whatever formatting it has before
+can you figure out what she might mean and generally overhaul the code here
+
+
+also serine:
+macOS's built-in Shortcuts app made it straightforward to make a script that converts clipboard contents to Markdown and also assign the global shortcut Ctrl+Cmd+M to it
